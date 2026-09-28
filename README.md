@@ -1,8 +1,10 @@
-# Pi Web
+# WebPi
 
 [中文文档](./README.zh-CN.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi). Pi Web uses the same local configuration and session files as pi, so you can browse and resume conversations, run agent turns, configure models and resources, and inspect project files from a browser.
+Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi). WebPi uses the same local configuration and session files as pi, so you can browse and resume conversations, run agent turns, configure models and resources, and inspect project files from a browser.
+
+WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application is upstream, this project adds the `webpi` command, the Pi package (`/webpi`), Windows-clean startup, and the WebPi name. See [docs/webpi.md](./docs/webpi.md) for exactly what differs and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline it was forked from.
 
 **[Try the interactive demo →](https://agegr.github.io/pi-web/)** The real Pi Web UI runs entirely in your browser, with sample sessions, files and models. There is nothing to install; replies are pre-written and no model is called.
 
@@ -19,28 +21,38 @@ Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi)
 
 ## Quick Start
 
-Pi Web requires Node.js 22.19.0 or newer. Check your version with `node --version`, then run:
+Pi Web requires Node.js 22.19.0 or newer. Check your version with `node --version`, then install this repository as the global `webpi` command:
 
 ```bash
-npx @agegr/pi-web@latest
+git clone https://github.com/agegr/pi-web
+cd pi-web
+npm install
+npm run build
+npm install -g .
+webpi
 ```
 
-The CLI opens a browser after the server is ready. If it does not, open [http://127.0.0.1:30141](http://127.0.0.1:30141). Pi Web listens only on `127.0.0.1` by default.
+`webpi` opens a browser after the server is ready. If it does not, open the URL it printed, by default [http://127.0.0.1:30141](http://127.0.0.1:30141). WebPi listens only on `127.0.0.1` by default.
 
-If no model provider is configured yet, open the **Models** panel to sign in or add an API key.
+If no model provider is configured yet, open the **Models** panel to sign in or add an API key — or run `/login` in the pi CLI, which writes the same credential store.
 
-To install the `pi-web` command globally:
+To use it from inside pi instead, install this directory as a Pi package:
 
 ```bash
-npm install -g @agegr/pi-web@latest
-pi-web
+pi install /path/to/pi-web
 ```
 
-To update, stop the running process with `Ctrl+C` and run the same install command again. To uninstall, run `npm uninstall -g @agegr/pi-web`.
+Then run `/webpi` in the pi TUI to start the server and get its URL. `/webpi --port 8080` forwards options to the same launcher.
+
+Upstream's published package is still available as `npx @agegr/pi-web@latest` if you want upstream without this packaging layer.
+
+To uninstall the global command, run `npm uninstall -g webpi`.
 
 ## Configuration
 
-For port and hostname, command-line options override the corresponding environment variables. Either `--no-open` or `PI_WEB_NO_OPEN=1` disables automatic browser opening. Run `pi-web --help` (or `-h`) to print startup options and exit without starting the server. Unknown options exit with an error.
+For port and hostname, command-line options override the corresponding environment variables. Either `--no-open` or `PI_WEB_NO_OPEN=1` disables automatic browser opening. Run `webpi --help` (or `-h`) to print startup options and exit without starting the server. Unknown options exit with an error.
+
+Environment variables keep their upstream `PI_WEB_*` names so existing instructions and wrappers keep working.
 
 | Option or environment variable | Purpose | Default |
 | --- | --- | --- |
@@ -56,9 +68,16 @@ For port and hostname, command-line options override the corresponding environme
 For example:
 
 ```bash
-pi-web --help
-pi-web -p 8080 -H 0.0.0.0 --no-open
+webpi --help
+webpi -p 8080 -H 0.0.0.0 --no-open
 ```
+
+### Startup behaviour
+
+- A WebPi server that already serves the requested port is reused: `webpi` reports its URL and exits instead of starting a second server over the same session files.
+- A port owned by another program is skipped; the launcher tries up to ten consecutive ports and prints the one it used.
+- `--port 0` asks the operating system for a free port.
+- The standalone `webpi` command keeps running until you stop it with `Ctrl+C`. A server started from `/webpi` inside pi stops with that pi session; start it from a shell when it must outlive the TUI.
 
 ### Remote Access
 
@@ -175,7 +194,9 @@ components/      React UI components
 hooks/           Client state and interaction hooks
 lib/             Session, agent, model, file, Git, and security logic
 public/          Static assets and PWA files
-bin/             npm CLI entrypoint and launch option parsing
+bin/             npm CLI entrypoint, launch option parsing, startup port selection
+extensions/      Pi package extension that provides the /webpi command
+skills/          Pi package skills
 docs/            Focused user and contributor guides
 demo/            Static browser demo published to GitHub Pages (see demo/README.md)
 ```
@@ -184,4 +205,4 @@ See [AGENTS.md](./AGENTS.md) for the architecture notes and detailed file map.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE). Upstream copyright and attribution are retained; WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web).
