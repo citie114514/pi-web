@@ -24,7 +24,7 @@ WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the ap
 Pi Web requires Node.js 22.19.0 or newer. Check your version with `node --version`, then install this repository as the global `webpi` command:
 
 ```bash
-git clone https://github.com/agegr/pi-web
+git clone https://github.com/citie114514/pi-web
 cd pi-web
 npm install
 npm run build

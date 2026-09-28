@@ -43,8 +43,11 @@ plugins — is upstream behaviour.
 
 ## Working on the fork
 
+Remotes: `origin` is this fork (<https://github.com/citie114514/pi-web>),
+`upstream` is `agegr/pi-web`. Push WebPi work to `origin` and merge upstream
+in, never the other way around.
+
 ```bash
-git remote add upstream https://github.com/agegr/pi-web.git   # once
 git fetch upstream
 git merge upstream/main
 ```
