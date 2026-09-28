@@ -36,7 +36,7 @@ function wireChildProcessLifecycle(
   function handleError(error) {
     const failedToSpawn = child.pid === undefined;
     log(
-      `[pi-web] ${failedToSpawn ? "could not run the Next.js process" : "Next.js process error"}: ${error.message}`,
+      `[webpi] ${failedToSpawn ? "could not run the Next.js process" : "Next.js process error"}: ${error.message}`,
     );
 
     if (failedToSpawn) {
@@ -70,7 +70,7 @@ function wireChildProcessLifecycle(
     // the window closing with no stated reason.
     if (!shuttingDown) {
       log(
-        `[pi-web] Next.js exited unexpectedly (${signal ? `signal ${signal}` : `code ${code}`})`,
+        `[webpi] Next.js exited unexpectedly (${signal ? `signal ${signal}` : `code ${code}`})`,
       );
     }
 

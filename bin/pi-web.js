@@ -21,6 +21,8 @@ const { getHelpText, parseLaunchOptions } = require("./pi-web-options");
 const { getNextNodeArgs } = require("./pi-web-node-args");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { wireChildProcessLifecycle } = require("./process-lifecycle");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { findFreePort, resolveStartPort } = require("./port-selection");
 
 let launchOptions;
 try {
@@ -38,7 +40,7 @@ if (launchOptions.help) {
   process.exit(0);
 }
 
-const { port, hostname, openBrowser } = launchOptions;
+const { hostname, openBrowser } = launchOptions;
 
 const pkgDir = path.join(__dirname, "..");
 const nextDir = path.join(pkgDir, ".next");
@@ -66,69 +68,117 @@ if (!fs.existsSync(nextDir)) {
   process.exit(1);
 }
 
-if (!loopbackHostnames.has(hostname)) {
+function warnAboutRemoteBinding() {
+  if (loopbackHostnames.has(hostname)) return;
+
   if (passwordEnabled) {
     console.warn(
-      `Warning: pi-web is listening on ${hostname} with password authentication over HTTP. Use HTTPS or a trusted VPN to protect the password in transit.`,
+      `Warning: webpi is listening on ${hostname} with password authentication over HTTP. Use HTTPS or a trusted VPN to protect the password in transit.`,
     );
   } else {
     console.warn(
-      `Warning: pi-web is listening on ${hostname} without authentication. Only use this on a trusted network.`,
+      `Warning: webpi is listening on ${hostname} without authentication. Only use this on a trusted network.`,
     );
   }
 }
 
-const nextArgs = ["start", "-p", port];
-nextArgs.push("-H", hostname);
-
-// Always run next's JS entry with node directly — avoids .bin symlink issues
-// and path-with-spaces problems on Windows when shell: true is used.
-const child = spawn(process.execPath, getNextNodeArgs(nextBin, nextArgs), {
-  cwd: pkgDir,
-  stdio: ["inherit", "pipe", "inherit"],
-  env: { ...process.env, PI_WEB_HOSTNAME: hostname },
-});
-wireChildProcessLifecycle(child);
-
-let browserOpened = false;
-const url = `http://${hostname}:${port}`;
-
-child.stdout.on("data", (chunk) => {
-  const text = chunk.toString();
-  process.stdout.write(text);
-  if (openBrowser && !browserOpened && text.includes("Ready")) {
-    browserOpened = true;
-    const isWindows = process.platform === "win32";
-    const isMac = process.platform === "darwin";
-    // Avoid `shell: true` to suppress Node.js DEP0190 deprecation
-    // ("Passing args to a child process with shell option true can lead to
-    // security vulnerabilities, as the arguments are not escaped").
-    // Pass a structured argv so Node.js handles escaping instead of
-    // concatenating the args into a shell command string.
-    let opener;
-    if (isWindows) {
-      // `start` is a cmd.exe built-in, so invoke cmd directly. The empty
-      // title argument is required by `start` before the target URL.
-      opener = spawn(process.env.ComSpec || "cmd.exe", ["/c", "start", "", url], {
-        stdio: "ignore",
-        detached: true,
-      });
-    } else if (isMac) {
-      opener = spawn("open", [url], {
-        stdio: "ignore",
-        detached: true,
-      });
-    } else {
-      opener = spawn("xdg-open", [url], {
-        stdio: "ignore",
-        detached: true,
-      });
-    }
-
-    opener.on("error", (error) => {
-      console.warn(`Could not open browser automatically: ${error.message}`);
+function openBrowserAt(url) {
+  const isWindows = process.platform === "win32";
+  const isMac = process.platform === "darwin";
+  // Avoid `shell: true` to suppress Node.js DEP0190 deprecation
+  // ("Passing args to a child process with shell option true can lead to
+  // security vulnerabilities, as the arguments are not escaped").
+  // Pass a structured argv so Node.js handles escaping instead of
+  // concatenating the args into a shell command string.
+  let opener;
+  if (isWindows) {
+    // `start` is a cmd.exe built-in, so invoke cmd directly. The empty
+    // title argument is required by `start` before the target URL.
+    opener = spawn(process.env.ComSpec || "cmd.exe", ["/c", "start", "", url], {
+      stdio: "ignore",
+      detached: true,
     });
-
-    opener.unref();
+  } else if (isMac) {
+    opener = spawn("open", [url], {
+      stdio: "ignore",
+      detached: true,
+    });
+  } else {
+    opener = spawn("xdg-open", [url], {
+      stdio: "ignore",
+      detached: true,
+    });
   }
+
+  opener.on("error", (error) => {
+    console.warn(`Could not open browser automatically: ${error.message}`);
+  });
+
+  opener.unref();
+}
+
+// `WebPi is already running at <url>` / `WebPi ready at <url>` are a contract:
+// the bundled /webpi Pi extension parses this line to report the real URL.
+async function main() {
+  const requestedPort = launchOptions.port;
+  const targetPort = requestedPort === "0" ? await findFreePort(hostname) : requestedPort;
+
+  let resolved;
+  try {
+    resolved = await resolveStartPort({ host: hostname, port: targetPort });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+
+  if (!resolved) {
+    console.error(
+      `No free port found between ${targetPort} and ${Number(targetPort) + 9}. Stop the process using it, or pass --port <port>.`,
+    );
+    process.exit(1);
+  }
+
+  const url = `http://${hostname}:${resolved.port}`;
+
+  if (resolved.alreadyRunning) {
+    console.log(`WebPi is already running at ${url}`);
+    console.log("Stop it first, or pass --port <port> to run another instance.");
+    if (openBrowser) openBrowserAt(url);
+    return;
+  }
+
+  if (resolved.port !== targetPort) {
+    console.warn(`Port ${targetPort} is in use; starting WebPi on ${resolved.port} instead.`);
+  }
+
+  warnAboutRemoteBinding();
+
+  const nextArgs = ["start", "-p", resolved.port];
+  nextArgs.push("-H", hostname);
+
+  // Always run next's JS entry with node directly — avoids .bin symlink issues
+  // and path-with-spaces problems on Windows when shell: true is used.
+  const child = spawn(process.execPath, getNextNodeArgs(nextBin, nextArgs), {
+    cwd: pkgDir,
+    stdio: ["inherit", "pipe", "inherit"],
+    env: { ...process.env, PI_WEB_HOSTNAME: hostname },
+  });
+  wireChildProcessLifecycle(child);
+
+  let browserOpened = false;
+  child.stdout.on("data", (chunk) => {
+    const text = chunk.toString();
+    process.stdout.write(text);
+    if (!browserOpened && text.includes("Ready")) {
+      browserOpened = true;
+      // Contract line for the bundled /webpi extension (see above).
+      console.log(`WebPi ready at ${url}`);
+      if (openBrowser) openBrowserAt(url);
+    }
+  });
+}
+
+void main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
 });

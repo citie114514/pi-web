@@ -1,7 +1,7 @@
 {
-  "name": "@agegr/pi-web",
+  "name": "webpi",
   "version": "0.9.3",
-  "description": "Web UI for the pi coding agent",
+  "description": "WebPi - out-of-the-box browser UI for the pi coding agent (downstream build of agegr/pi-web)",
   "homepage": "https://github.com/agegr/pi-web#readme",
   "repository": {
     "type": "git",
@@ -15,16 +15,44 @@
     "node": ">=22.19.0"
   },
   "bin": {
-    "pi-web": "bin/pi-web.js"
+    "webpi": "bin/pi-web.js"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "webpi",
+    "web-ui",
+    "agent"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/webpi/index.ts"
+    ],
+    "skills": [
+      "./skills/webpi"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
   },
   "files": [
     "bin",
+    "extensions",
+    "skills",
     ".next",
     "!.next/cache",
     "!.next/dev",
     "!.next/**/*.js.map",
     "public",
     "next.config.ts",
+    "docs/webpi.md",
+    "docs/upstream-inventory.md",
     "package.json"
   ],
   "scripts": {

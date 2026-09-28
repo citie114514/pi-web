@@ -5,6 +5,9 @@ import { getPiWebReleaseUrl, isNewerStableVersion } from "@/lib/app-update";
 export const dynamic = "force-dynamic";
 
 const CURRENT_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0";
+// WebPi tracks the upstream pi-web release channel: upstream is where new
+// versions come from, so the update banner reports upstream versions. See
+// docs/webpi.md before changing this to a WebPi-specific registry entry.
 const NPM_LATEST_URL = "https://registry.npmjs.org/@agegr%2Fpi-web/latest";
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 5_000;

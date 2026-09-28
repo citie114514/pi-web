@@ -1,6 +1,6 @@
 import type { LocalePlugin } from "../types";
 
-/** Pi Web 内置英语语言包。 */
+/** WebPi 内置英语语言包。 */
 export const enLocale: LocalePlugin = {
   id: "en",
   label: "English",
@@ -14,7 +14,7 @@ export const enLocale: LocalePlugin = {
     "common.settings": "Settings",
     "settings.title": "Settings",
     "settings.general": "General",
-    "settings.generalDescription": "Choose how Pi Web looks and which language it uses.",
+    "settings.generalDescription": "Choose how WebPi looks and which language it uses.",
     "settings.appearance": "Appearance",
     "settings.appearanceDescription": "Select a theme or follow your system preference.",
     "settings.chatContentWidth": "Chat content width",
@@ -58,8 +58,8 @@ export const enLocale: LocalePlugin = {
     "skills.scope.project": "project",
     "skills.scope.path": "path",
     "agents.close": "Close",
-    "agents.builtInTitle": "Enable Pi Web built-in sub-agents",
-    "agents.builtInDescription": "Provides Pi Web's integrated Agent tools and disables a conflicting pi-subagents extension.",
+    "agents.builtInTitle": "Enable WebPi built-in sub-agents",
+    "agents.builtInDescription": "Provides WebPi's integrated Agent tools and disables a conflicting pi-subagents extension.",
     "agents.reloadRequired": "Reload the current session to apply this change.",
     "agents.reloadSession": "Reload session",
     "agents.maxConcurrent": "Concurrent sub-agents",
@@ -114,7 +114,7 @@ export const enLocale: LocalePlugin = {
     "agentSwitcher.status.failed": "Failed",
     "agentSwitcher.status.aborted": "Aborted",
     "agentSwitcher.status.interrupted": "Interrupted",
-    "appUpdate.releaseNotes": "Pi Web v{version} is available. View release notes",
+    "appUpdate.releaseNotes": "WebPi v{version} is available. View release notes",
     "sidebar.hide": "Hide sidebar",
     "sidebar.show": "Show sidebar",
     "theme.light": "Theme: Light",

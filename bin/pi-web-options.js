@@ -30,9 +30,10 @@ function normalizePort(value) {
 }
 
 function getHelpText() {
-  return `Usage: pi-web [options]
+  return `Usage: webpi [options]
 
-Start the Pi Web UI server.
+Start the WebPi server. WebPi is the local browser UI for the pi coding agent;
+it reads the same pi configuration, credentials and sessions as the pi CLI.
 
 Options:
   -p, --port <port>          Server port (default: 30141, or PORT)
@@ -40,13 +41,13 @@ Options:
       --no-open              Do not open a browser automatically
   -h, --help                 Show this help message and exit
 
-Environment:
+Environment (PI_WEB_* names are kept from upstream pi-web):
   PORT                       Default port when --port is omitted
   PI_WEB_HOSTNAME            Default hostname when --hostname is omitted
   PI_WEB_NO_OPEN             Set to 1/true/yes/on to disable browser open
   PI_WEB_PASSWORD            Enable browser password login and API Basic Auth
   PI_WEB_ALLOWED_HOSTS       Extra exact proxy/custom hostnames, comma-separated
-  PI_WEB_SKIP_VERSION_CHECK  Set to 1 to disable Pi Web update checks
+  PI_WEB_SKIP_VERSION_CHECK  Set to 1 to disable WebPi update checks
   PI_WEB_IDLE_TIMEOUT_MS     Session idle timeout in ms (0 disables; default 600000)
 `;
 }

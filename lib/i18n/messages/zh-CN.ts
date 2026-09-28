@@ -1,6 +1,6 @@
 import type { LocalePlugin } from "../types";
 
-/** Pi Web 内置简体中文语言包。 */
+/** WebPi 内置简体中文语言包。 */
 export const zhCNLocale: LocalePlugin = {
   id: "zh-CN",
   label: "简体中文",
@@ -14,7 +14,7 @@ export const zhCNLocale: LocalePlugin = {
     "common.settings": "设置",
     "settings.title": "设置",
     "settings.general": "常规",
-    "settings.generalDescription": "选择 Pi Web 的显示方式和界面语言。",
+    "settings.generalDescription": "选择 WebPi 的显示方式和界面语言。",
     "settings.appearance": "外观",
     "settings.appearanceDescription": "选择浅色或深色主题，也可以跟随系统设置。",
     "settings.chatContentWidth": "聊天内容宽度",
@@ -58,8 +58,8 @@ export const zhCNLocale: LocalePlugin = {
     "skills.scope.project": "项目",
     "skills.scope.path": "路径",
     "agents.close": "关闭",
-    "agents.builtInTitle": "启用 Pi Web 内置子代理",
-    "agents.builtInDescription": "提供 Pi Web 集成的 Agent 工具，并停用发生冲突的 pi-subagents 扩展。",
+    "agents.builtInTitle": "启用 WebPi 内置子代理",
+    "agents.builtInDescription": "提供 WebPi 集成的 Agent 工具，并停用发生冲突的 pi-subagents 扩展。",
     "agents.reloadRequired": "重新加载当前会话后生效。",
     "agents.reloadSession": "重新加载会话",
     "agents.maxConcurrent": "并发子代理数",
@@ -114,7 +114,7 @@ export const zhCNLocale: LocalePlugin = {
     "agentSwitcher.status.failed": "失败",
     "agentSwitcher.status.aborted": "已中止",
     "agentSwitcher.status.interrupted": "已中断",
-    "appUpdate.releaseNotes": "Pi Web v{version} 可用，查看更新说明",
+    "appUpdate.releaseNotes": "WebPi v{version} 可用，查看更新说明",
     "sidebar.hide": "隐藏侧边栏",
     "sidebar.show": "显示侧边栏",
     "theme.light": "主题：浅色",
