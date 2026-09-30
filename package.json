@@ -149,16 +149,10 @@
       "icon": "desktop/assets/icon.png",
       "target": [
         {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "target": "nsis"
         },
         {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
+          "target": "portable"
         }
       ]
     },
@@ -180,18 +174,10 @@
       "description": "WebPi runs the pi coding agent's browser interface as a desktop application and starts and stops its local server with the app.",
       "target": [
         {
-          "target": "AppImage",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "target": "AppImage"
         },
         {
-          "target": "deb",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "target": "deb"
         }
       ],
       "desktop": {
@@ -220,18 +206,10 @@
       "category": "public.app-category.developer-tools",
       "target": [
         {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "target": "dmg"
         },
         {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "target": "zip"
         }
       ],
       "extendInfo": {

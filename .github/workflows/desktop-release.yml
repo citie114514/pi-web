@@ -43,18 +43,22 @@ jobs:
           - name: Windows x64
             runner: windows-latest
             args: --win
+            arch: x64
             unpacked: win-unpacked
           - name: Linux x64
             runner: ubuntu-22.04
             args: --linux --x64
+            arch: x64
             unpacked: linux-unpacked
           - name: Linux arm64
             runner: ubuntu-22.04-arm
             args: --linux --arm64
+            arch: arm64
             unpacked: linux-arm64-unpacked
           - name: macOS x64 and arm64
             runner: macos-14
             args: --mac --x64 --arm64
+            arch: ""
             unpacked: mac
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +74,10 @@ jobs:
         # job below creates a release.
         run: npx electron-builder ${{ matrix.args }} --publish never
       - name: Assemble portable archives
+        env:
+          # Authoritative architecture for the archive name. On the macOS job two
+          # architectures are built at once, so the name comes from the folder.
+          WEBPI_PORTABLE_ARCH: ${{ matrix.arch }}
         run: node desktop/make-portable.mjs
       - uses: actions/upload-artifact@v4
         with:

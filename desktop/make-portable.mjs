@@ -8,14 +8,23 @@
 //
 // Mirrors the installer layout, so both forms share one runtime tree.
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
-const { PORTABLE_MARKER } = require("./portable.js");
+const { PORTABLE_MARKER, executableDir, platformLabel } = require("./portable.js");
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const releaseDir = join(root, "release");
@@ -29,20 +38,6 @@ function unpackedDirs() {
     .filter((name) => name.endsWith("-unpacked") || name === "mac" || name.startsWith("mac-"))
     .map((name) => join(releaseDir, name))
     .filter((dir) => statSync(dir).isDirectory());
-}
-
-function platformLabel(dir) {
-  const base = dir.split(/[\\/]/).pop();
-  const os = base.startsWith("win") ? "win" : base.startsWith("linux") ? "linux" : "mac";
-  const arch = base.endsWith("arm64") ? "arm64" : base.endsWith("ia32") ? "ia32" : "x64";
-  return `${os}-${arch}`;
-}
-
-/** macOS keeps the executable inside the .app bundle; every other platform is flat. */
-function executableDir(appDir) {
-  const bundle = readdirSync(appDir).find((name) => name.endsWith(".app"));
-  if (!bundle) return appDir;
-  return join(appDir, bundle, "Contents", "MacOS");
 }
 
 /**
@@ -125,8 +120,16 @@ if (dirs.length === 0) {
 mkdirSync(outDir, { recursive: true });
 const sums = [];
 
-for (const appDir of dirs) {
-  const label = platformLabel(appDir);
+// Two folders must never share an archive name: the second zip would silently
+// replace the first and drop that architecture from the release.
+const targets = dirs.map((appDir) => ({ appDir, label: platformLabel(appDir) }));
+const labels = targets.map((target) => target.label);
+if (new Set(labels).size !== labels.length) {
+  console.error(`[portable] 产物目录重名（${labels.join(", ")}），请清理 release/ 后重新打包`);
+  process.exit(1);
+}
+
+for (const { appDir, label } of targets) {
   const staging = join(outDir, `WebPi-${version}-${label}-portable`);
   const archive = `${staging}.zip`;
 
