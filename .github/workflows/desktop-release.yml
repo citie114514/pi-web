@@ -1,0 +1,115 @@
+name: Desktop
+
+# Builds the WebPi desktop application for Windows, Linux, and macOS.
+#
+# Every platform produces an installer and a portable archive:
+#   Windows  WebPi-Setup-<version>-x64.exe      + WebPi-Portable-<version>-x64.exe + *-portable.zip
+#   Linux    WebPi-<version>-linux-<arch>.AppImage / .deb + *-portable.zip
+#   macOS    WebPi-Setup-<version>-<arch>.dmg   + *-portable.zip
+#
+# Portable archives keep their settings inside the extracted folder (see
+# desktop/portable.js). Signing is not configured, so Windows SmartScreen and
+# macOS Gatekeeper warn on first launch; see docs/webpi-desktop.md.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "bin/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/desktop-release.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-latest
+            args: --win
+            unpacked: win-unpacked
+          - name: Linux x64
+            runner: ubuntu-22.04
+            args: --linux --x64
+            unpacked: linux-unpacked
+          - name: Linux arm64
+            runner: ubuntu-22.04-arm
+            args: --linux --arm64
+            unpacked: linux-arm64-unpacked
+          - name: macOS x64 and arm64
+            runner: macos-14
+            args: --mac --x64 --arm64
+            unpacked: mac
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: npm
+      - run: npm ci
+      - name: Build the web application
+        run: npm run build
+      - name: Package the desktop application
+        # --publish never: this workflow uploads artifacts and only the release
+        # job below creates a release.
+        run: npx electron-builder ${{ matrix.args }} --publish never
+      - name: Assemble portable archives
+        run: node desktop/make-portable.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webpi-desktop-${{ matrix.name }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+            release/portable/*.zip
+            release/portable/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Combine checksums
+        run: |
+          cd artifacts
+          # Each platform job uploads its own SHA256SUMS.txt; they collide here,
+          # so the combined file is recomputed over every published artifact.
+          rm -f SHA256SUMS.txt
+          find . -maxdepth 1 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.zip' \) -print0 \
+            | sort -z | xargs -0 sha256sum | tee SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.exe
+            artifacts/*.dmg
+            artifacts/*.AppImage
+            artifacts/*.deb
+            artifacts/*.zip
+            artifacts/SHA256SUMS.txt
+          fail_on_unmatched_files: false
+          generate_release_notes: true
