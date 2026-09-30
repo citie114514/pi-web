@@ -11,6 +11,7 @@
     "url": "https://github.com/agegr/pi-web/issues"
   },
   "license": "MIT",
+  "main": "desktop/main.js",
   "engines": {
     "node": ">=22.19.0"
   },
@@ -33,16 +34,9 @@
       "./skills/webpi"
     ]
   },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
-  },
-  "peerDependenciesMeta": {
-    "@earendil-works/pi-coding-agent": {
-      "optional": true
-    }
-  },
   "files": [
     "bin",
+    "desktop",
     "extensions",
     "skills",
     ".next",
@@ -57,6 +51,10 @@
   ],
   "scripts": {
     "postinstall": "node bin/prepare-terminal.js",
+    "desktop": "electron desktop/main.js",
+    "desktop:icons": "node desktop/make-icons.mjs",
+    "desktop:dir": "electron-builder --dir",
+    "desktop:dist": "electron-builder",
     "dev": "next dev -H 127.0.0.1 -p 30141",
     "dev:lan": "next dev -H 0.0.0.0 -p 30141",
     "build": "next build --webpack",
@@ -66,7 +64,12 @@
     "test:terminal": "node e2e/terminal.mjs",
     "test:e2e": "node e2e/run.mjs",
     "test": "node --experimental-strip-types --test \"app/**/*.test.mjs\" \"components/**/*.test.mjs\" \"hooks/**/*.test.mjs\" \"lib/**/*.test.mjs\" \"public/**/*.test.mjs\"",
-    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public"
+    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public",
+    "desktop:dist:win": "electron-builder --win",
+    "desktop:dist:linux": "electron-builder --linux",
+    "desktop:dist:mac": "electron-builder --mac",
+    "desktop:portable": "node desktop/make-portable.mjs",
+    "desktop:release": "electron-builder && node desktop/make-portable.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",
@@ -96,6 +99,8 @@
     "@types/semver": "7.8.0",
     "@types/web-push": "^3.6.4",
     "ansi_up": "^6.0.6",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "jiti": "^2.7.0",
@@ -114,5 +119,132 @@
     "remark-math": "^6.0.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^5"
+  },
+  "build": {
+    "appId": "dev.webpi.desktop",
+    "productName": "WebPi",
+    "copyright": "MIT - WebPi (downstream build of pi-web by agegr)",
+    "directories": {
+      "output": "release",
+      "buildResources": "desktop/assets"
+    },
+    "asar": false,
+    "npmRebuild": false,
+    "files": [
+      "desktop/**/*",
+      "bin/**/*",
+      "public/**/*",
+      "next.config.ts",
+      "package.json",
+      ".next/**/*",
+      "!.next/cache/**",
+      "!.next/dev/**",
+      "!**/*.map"
+    ],
+    "extraMetadata": {
+      "main": "desktop/main.js"
+    },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "icon": "desktop/assets/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "WebPi",
+      "artifactName": "WebPi-Setup-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "WebPi-Portable-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "desktop/assets/icon.png",
+      "category": "Development",
+      "maintainer": "WebPi <webpi@users.noreply.github.com>",
+      "synopsis": "WebPi - local browser UI for the pi coding agent",
+      "description": "WebPi runs the pi coding agent's browser interface as a desktop application and starts and stops its local server with the app.",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "desktop": {
+        "entry": {
+          "Name": "WebPi",
+          "Comment": "Local browser UI for the pi coding agent",
+          "Categories": "Development;Utility;",
+          "Terminal": "false"
+        }
+      }
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libsecret-1-0"
+      ]
+    },
+    "mac": {
+      "icon": "desktop/assets/icon.png",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "LSMinimumSystemVersion": "11.0"
+      },
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "artifactName": "WebPi-Setup-${version}-${arch}.${ext}"
+    }
+  },
+  "author": {
+    "name": "WebPi",
+    "email": "webpi@users.noreply.github.com"
   }
 }

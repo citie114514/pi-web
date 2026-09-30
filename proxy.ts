@@ -80,7 +80,7 @@ export function proxy(request: NextRequest) {
       status: 401,
       headers: {
         "Cache-Control": "no-store",
-        "WWW-Authenticate": 'Basic realm="Pi Web", charset="UTF-8"',
+        "WWW-Authenticate": 'Basic realm="WebPi", charset="UTF-8"',
       },
     });
   }

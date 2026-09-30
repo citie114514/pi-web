@@ -602,7 +602,7 @@ export const zhTWLocale: LocalePlugin = {
     "models.catalogUpdated": "已從服務商更新模型列表。",
     "models.catalogUnchanged": "模型列表已是最新。",
     "models.catalogUnreachable": "無法取得模型目錄。請檢查網路連線與該 provider 的憑證後再試一次。",
-    "models.catalogOffline": "已設定 PI_OFFLINE，pi-web 不會連網取得模型目錄。",
+    "models.catalogOffline": "已設定 PI_OFFLINE，WebPi 不會連網取得模型目錄。",
     "models.enabledCustomEmpty": "這個 provider 目前沒有可用模型。請先儲存修改，並確認 API key 有效。",
     "models.enabledStale": "{count} 筆失配",
     "models.enabledStaleHint": "模型可用的前提是它所屬的 provider 有可用憑證。憑證缺失、模型被改名或刪除、設定是給別的機器寫的，都會讓條目比對不到任何模型。",

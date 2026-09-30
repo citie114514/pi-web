@@ -4,7 +4,7 @@
 
 Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi). WebPi uses the same local configuration and session files as pi, so you can browse and resume conversations, run agent turns, configure models and resources, and inspect project files from a browser.
 
-WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application is upstream, this project adds the `webpi` command, the Pi package (`/webpi`), Windows-clean startup, and the WebPi name. See [docs/webpi.md](./docs/webpi.md) for exactly what differs and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline it was forked from.
+WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application is upstream, this project adds the `webpi` command, the WebPi desktop application, the Pi package (`/webpi`), Windows-clean startup, and the WebPi name. This fork lives at <https://github.com/citie114514/pi-web>. See [docs/webpi.md](./docs/webpi.md) for exactly what differs, [docs/webpi-desktop.md](./docs/webpi-desktop.md) for the desktop build, and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline it was forked from.
 
 **[Try the interactive demo →](https://agegr.github.io/pi-web/)** The real Pi Web UI runs entirely in your browser, with sample sessions, files and models. There is nothing to install; replies are pre-written and no model is called.
 
@@ -47,6 +47,24 @@ Then run `/webpi` in the pi TUI to start the server and get its URL. `/webpi --p
 Upstream's published package is still available as `npx @agegr/pi-web@latest` if you want upstream without this packaging layer.
 
 To uninstall the global command, run `npm uninstall -g webpi`.
+
+## Desktop application
+
+The same application also runs as a standalone desktop app: its own window and
+tray icon, and a real lifecycle — starting the app starts the WebPi service, and
+quitting it stops that service. Closing the window asks whether to minimize to
+the tray or to close everything, and can remember the answer.
+
+```bash
+npm run desktop          # run from source
+npm run desktop:dist     # installer + portable for this platform
+```
+
+Artifacts land in `release/`: a Windows installer (NSIS, per-user) plus a
+single-file portable, AppImage and `.deb` for Linux, a `.dmg` for macOS, and a
+portable `.zip` per platform that keeps its settings inside the extracted folder.
+See [docs/webpi-desktop.md](./docs/webpi-desktop.md) for portable mode, signing
+notes, and the CI workflow.
 
 ## Configuration
 
@@ -195,6 +213,7 @@ hooks/           Client state and interaction hooks
 lib/             Session, agent, model, file, Git, and security logic
 public/          Static assets and PWA files
 bin/             npm CLI entrypoint, launch option parsing, startup port selection
+desktop/         Electron shell: window, tray, service lifecycle, packaging
 extensions/      Pi package extension that provides the /webpi command
 skills/          Pi package skills
 docs/            Focused user and contributor guides

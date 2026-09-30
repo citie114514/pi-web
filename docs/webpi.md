@@ -20,7 +20,8 @@ branding layer, so upstream changes stay easy to merge:
 | Startup | `webpi` picks a usable port before starting Next.js, reuses a WebPi server that already serves that port, skips ports owned by other programs, and prints one contract line with the real URL |
 | Branding | Page title, PWA manifest, login page, window title, offline page and the three UI locales |
 | Pi package | `pi.extensions` + `pi.skills` add the `/webpi` command and its skill |
-| Docs | This file, `docs/upstream-inventory.md`, and the README quick start |
+| Desktop app | `desktop/` adds an Electron shell (window + tray, service started and stopped with the app, close dialog), packaging for Windows/Linux/macOS, and a portable mode — see `docs/webpi-desktop.md` |
+| Docs | This file, `docs/webpi-desktop.md`, `docs/upstream-inventory.md`, and the README quick start |
 
 Everything else — sessions, models, configuration, tools, terminal, worktrees,
 plugins — is upstream behaviour.
@@ -69,8 +70,11 @@ Two additions live in this repository:
 - `extensions/webpi/index.ts` — the `/webpi` command. It starts the bundled
   launcher, parses the `WebPi ready at <url>` / `WebPi is already running at <url>`
   contract line, and kills the launcher's process tree on session shutdown.
+- `desktop/` — the Electron shell and its packaging, unit tested by
+  `lib/desktop-*.test.mjs`. Its only shared contract with the launcher is the
+  readiness line above.
 
-Changing that contract line means changing both sides together.
+Changing that contract line means changing all three sides together.
 
 ## Licence
 

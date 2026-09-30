@@ -40,6 +40,7 @@ merge and update this file when the facts change.
 | Lint | `npm run lint` |
 | Unit tests | `npm test` (node test runner over `app/`, `components/`, `hooks/`, `lib/`, `public/`) |
 | E2E (Playwright) | `npm run test:e2e`, `npm run test:terminal` |
+| Desktop app (Windows/Linux/macOS) | `npm run desktop` (source) / `npm run desktop:dist` (installer + portable) / `npm run desktop:portable` (marker + zip + SHA256SUMS) |
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests, then a build
 plus Playwright E2E on Node 22.19.0. `.github/workflows/demo-pages.yml` builds
@@ -47,12 +48,17 @@ plus Playwright E2E on Node 22.19.0. `.github/workflows/demo-pages.yml` builds
 
 ## Test baseline on Windows
 
-`npm test` reported **1307 tests, 1295 passing, 10 failing** before any change
-in this fork. After the WebPi packaging layer added 21 tests (port selection and
-package contract), it reports **1328 tests, 1317 passing, 9 failing** — the same
-pre-existing failures, no new ones:
+`npm test` reported **1307 tests, 1295 passing, 9 failing** before any change
+in this fork. After the WebPi packaging layer and the desktop shell added tests
+(port selection, package contract, close policy, tray menu, service supervisor,
+desktop settings, portable resolution, packaging config), it reports **1380
+tests, 1369 passing, 9 failing, 2 skipped** — the same pre-existing failures,
+no new ones:
 
-- `only the active file tab mounts a FileViewer` and its three siblings
+- `only the active file tab mounts a FileViewer`
+- `the active viewer restores tab state and saves it with a revision`
+- `closing the file panel pauses the active viewer watcher`
+- `markdown preview links forward a PDF page fragment to the viewer`
 - `renders image warnings for known text-only defaults without an explicit model selection`
 - `a project-level value is reported as shadowing the global one`
 - `direct bash updates the platform PATH key`
@@ -64,6 +70,16 @@ because that would diverge from upstream without addressing the product goal.
 `lib/subagent-isolation.test.mjs` (`isolated worktrees are unique, write-safe, …`)
 is load-sensitive in a full parallel run while passing on its own; treat it as
 flaky, not as a regression signal.
+
+## Desktop packaging note
+
+The Windows artifact set was built and exercised on this machine
+(`electron-builder --win`): NSIS installer, single-file portable, and the
+portable zip. A packaged build starts its own service, loads the UI, and releases
+the port when the app quits; a portable build writes its settings into the
+extracted folder. Linux and macOS targets are configured and built by
+`.github/workflows/desktop-release.yml`; they were not built locally because
+cross-building is not supported.
 
 ## Configuration and data touched at runtime
 

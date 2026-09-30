@@ -22,7 +22,7 @@ const { getNextNodeArgs } = require("./pi-web-node-args");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { wireChildProcessLifecycle } = require("./process-lifecycle");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { findFreePort, resolveStartPort } = require("./port-selection");
+const { findFreePort, resolveStartPort, MAX_PORT_ATTEMPTS } = require("./port-selection");
 
 let launchOptions;
 try {
@@ -133,7 +133,7 @@ async function main() {
 
   if (!resolved) {
     console.error(
-      `No free port found between ${targetPort} and ${Number(targetPort) + 9}. Stop the process using it, or pass --port <port>.`,
+      `No usable port found after ${MAX_PORT_ATTEMPTS} attempts starting at ${targetPort}. Stop the process using it, or pass --port <port> where <port> is a free port Next.js also accepts.`,
     );
     process.exit(1);
   }
