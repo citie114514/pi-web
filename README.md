@@ -2,13 +2,19 @@
 
 [中文文档](./README.zh-CN.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi). WebPi uses the same local configuration and session files as pi, so you can browse and resume conversations, run agent turns, configure models and resources, and inspect project files from a browser.
+WebPi is a local browser UI for the [pi coding agent](https://github.com/earendil-works/pi), packaged so that it works out of the box. It reads the same configuration, credential, and session files as pi, so a conversation started in the terminal opens in the browser — and one started in the browser is still there in the terminal. Browse and resume sessions, run agent turns, configure models and resources, and inspect project files, all from a browser window on your own machine.
 
-WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application is upstream, this project adds the `webpi` command, the WebPi desktop application, the Pi package (`/webpi`), Windows-clean startup, and the WebPi name. This fork lives at <https://github.com/citie114514/pi-web>. See [docs/webpi.md](./docs/webpi.md) for exactly what differs, [docs/webpi-desktop.md](./docs/webpi-desktop.md) for the desktop build, [docs/upstream-sync.md](./docs/upstream-sync.md) for how upstream changes are merged, and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline it was forked from.
+![WebPi start screen: session sidebar, Get Started panel, and the Models, Skills and Settings entries](./docs/screenshot.png)
 
-**[Try the interactive demo →](https://agegr.github.io/pi-web/)** The real Pi Web UI runs entirely in your browser, with sample sessions, files and models. There is nothing to install; replies are pre-written and no model is called.
+Three ways to run it. All three share one set of pi data: sessions and credentials stay in `~/.pi/agent`, so they see the same conversations whichever one you use.
 
-![Pi Web displaying a pi session with structured Markdown, tool calls, and project navigation](https://raw.githubusercontent.com/agegr/pi-web/main/docs/screenshot2.png)
+| Way | Use it when | Needs |
+| --- | --- | --- |
+| [**Desktop app**](#desktop-application) | You want a window and tray icon to double-click, and a server that starts and stops with it | Nothing beyond the download — it carries its own Node.js |
+| [**`webpi` command**](#the-webpi-command) | You want a server you can attach to from any browser, or run headless | Node.js 22.19.0 or newer |
+| [**Pi package**](#as-a-pi-package) | You are already in a pi session and want `/webpi` to bring up the UI | pi |
+
+WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web). The application itself is upstream's work; this repository adds the `webpi` command, the desktop application, the Pi package, Windows-friendly startup, and the WebPi name. Read [docs/webpi.md](./docs/webpi.md) for exactly what differs, [docs/webpi-desktop.md](./docs/webpi-desktop.md) for the desktop build, [docs/upstream-sync.md](./docs/upstream-sync.md) for how upstream changes are merged in, and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline this fork started from.
 
 ## Features
 
@@ -16,12 +22,27 @@ WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the ap
 - **Two ways to branch**: **New session** creates an independent session file from an earlier message; **Edit from here** creates a branch inside the current session.
 - **Project file tools**: browse and upload files, inspect Git diffs, and preview source, Markdown, images, audio, PDFs, and DOCX files with automatic refresh.
 - **Git worktrees**: switch checkouts from the sidebar while keeping sessions from the same repository grouped together.
-- **Web-based configuration**: manage provider login and API keys, models, model tests, plugin packages, and skills without leaving Pi Web.
-- **English, Simplified Chinese, and Traditional Chinese UI**: Pi Web follows the browser language initially and provides a language switcher in the top bar.
+- **Web-based configuration**: manage provider login and API keys, models, model tests, plugin packages, and skills without leaving the browser.
+- **English, Simplified Chinese, and Traditional Chinese UI**: the interface follows the browser language initially and provides a language switcher in the top bar.
 
 ## Quick Start
 
-Pi Web requires Node.js 22.19.0 or newer. Check your version with `node --version`, then install this repository as the global `webpi` command:
+### Desktop application
+
+Download the build for your platform from the [releases page](https://github.com/citie114514/pi-web/releases/latest) and run it. Starting the app starts the WebPi server, and quitting it stops that server. Nothing else needs to be installed.
+
+| Platform | Installer | Portable |
+| --- | --- | --- |
+| Windows x64 | `WebPi-Setup-<version>-x64.exe` (per-user, no administrator rights) | `WebPi-Portable-<version>-x64.exe`, `WebPi-<version>-win-x64-portable.zip` |
+| Linux x64 | `WebPi-<version>-linux-x86_64.AppImage`, `WebPi-<version>-linux-amd64.deb` | `WebPi-<version>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi-<version>-linux-arm64.AppImage`, `WebPi-<version>-linux-arm64.deb` | `WebPi-<version>-linux-arm64-portable.zip` |
+| macOS x64 / arm64 | `WebPi-Setup-<version>-<arch>.dmg` | `WebPi-<version>-mac-<arch>-portable.zip` |
+
+See [Desktop application](#desktop-application) for what the app does with the server, portable mode, and the signing warnings.
+
+### The `webpi` command
+
+Requires Node.js 22.19.0 or newer. Check with `node --version`, then install this repository as a global command:
 
 ```bash
 git clone https://github.com/citie114514/pi-web
@@ -32,61 +53,49 @@ npm install -g .
 webpi
 ```
 
-`webpi` opens a browser after the server is ready. If it does not, open the URL it printed, by default [http://127.0.0.1:30141](http://127.0.0.1:30141). WebPi listens only on `127.0.0.1` by default.
+`webpi` opens a browser once the server is ready. If it does not, open the URL it printed, by default [http://127.0.0.1:30141](http://127.0.0.1:30141). WebPi listens only on `127.0.0.1` by default. To remove the command later, run `npm uninstall -g webpi`.
 
-If no model provider is configured yet, open the **Models** panel to sign in or add an API key — or run `/login` in the pi CLI, which writes the same credential store.
+### As a Pi package
 
-To use it from inside pi instead, install this directory as a Pi package:
+Install this directory as a Pi package to start the server from inside pi:
 
 ```bash
 pi install /path/to/pi-web
 ```
 
-Then run `/webpi` in the pi TUI to start the server and get its URL. `/webpi --port 8080` forwards options to the same launcher.
+Then run `/webpi` in the pi TUI to start the server and get its URL. `/webpi --port 8080` forwards options to the same launcher. A server started this way stops with that pi session; start it from a shell or the desktop app when it must outlive the TUI.
 
-Upstream's published package is still available as `npx @agegr/pi-web@latest` if you want upstream without this packaging layer.
+### Configure a model
 
-To uninstall the global command, run `npm uninstall -g webpi`.
+If no model provider is configured yet, open the **Models** panel and sign in or add an API key. The Models panel uses pi's own model, settings, and credential storage, so whichever interface you use, the change is visible in the other. Running `/login` in the pi CLI writes the same credential store.
+
+Upstream's published package remains available as `npx @agegr/pi-web@latest` if you want upstream without this packaging layer.
 
 ## Desktop application
 
-WebPi also runs as a standalone desktop app: its own window and tray icon, and a
-real lifecycle — starting the app starts the WebPi service, and quitting the app
-stops that service. Closing the window asks whether to minimize to the tray or to
-close everything, and can remember the answer.
+The desktop build is the same application in its own window, with a tray icon and a real lifecycle:
 
-Download a build from the [releases page](https://github.com/citie114514/pi-web/releases/latest):
+- **Starting the app starts the service, quitting the app stops it.** A server this app did not start is never stopped: if another WebPi already serves the port, the app starts its own instance on a free port so that quitting is always safe.
+- **Closing the window asks what to do** — minimize to the tray, or close everything — and can remember the answer. Change it any time from the tray menu.
+- **The tray menu** also shows or hides the window, restarts the service, and quits. If the service exits unexpectedly, a dialog offers to restart it or exit.
+- **Portable mode**: the portable archives keep their settings inside the extracted folder, so the whole folder can be moved to a USB stick. Pi's own data still lives in `~/.pi/agent`.
 
-| Platform | Installer | Portable |
-| --- | --- | --- |
-| Windows x64 | `WebPi-Setup-<version>-x64.exe` (per-user, no administrator) | `WebPi-Portable-<version>-x64.exe`, `WebPi-<version>-win-x64-portable.zip` |
-| Linux x64 | `WebPi-<version>-linux-x86_64.AppImage`, `WebPi-<version>-linux-amd64.deb` | `WebPi-<version>-linux-x64-portable.zip` |
-| Linux arm64 | `WebPi-<version>-linux-arm64.AppImage`, `WebPi-<version>-linux-arm64.deb` | `WebPi-<version>-linux-arm64-portable.zip` |
-| macOS x64 / arm64 | `WebPi-Setup-<version>-<arch>.dmg` | `WebPi-<version>-mac-<arch>-portable.zip` |
+The builds are not signed, so Windows SmartScreen and macOS Gatekeeper warn on first launch; [docs/webpi-desktop.md](./docs/webpi-desktop.md) explains the warnings, portable mode, code signing, and the CI release workflow.
 
-The packaged app runs its server with Electron's own Node.js, so it does not need
-Node.js installed. The builds are not signed, so Windows SmartScreen and macOS
-Gatekeeper warn on first launch. The portable archives keep their settings inside
-the extracted folder, so the whole folder can be moved to a USB stick; see
-[docs/webpi-desktop.md](./docs/webpi-desktop.md) for portable mode, the signing
-warnings, and how to build or publish a release.
-
-To build it yourself:
+To build it from source:
 
 ```bash
 npm run desktop          # run from source
 npm run desktop:dist     # installer + portable for this platform
 ```
 
-Artifacts land in `release/`. `.github/workflows/desktop-release.yml` builds every
-platform, starts each packaged artifact to verify it boots, and publishes the
-release.
+Artifacts land in `release/`. `.github/workflows/desktop-release.yml` builds every platform, starts each packaged artifact to verify that it boots, and publishes the release.
 
 ## Configuration
 
-For port and hostname, command-line options override the corresponding environment variables. Either `--no-open` or `PI_WEB_NO_OPEN=1` disables automatic browser opening. Run `webpi --help` (or `-h`) to print startup options and exit without starting the server. Unknown options exit with an error.
+For the port and hostname, command-line options override the corresponding environment variables. Either `--no-open` or `PI_WEB_NO_OPEN=1` disables automatic browser opening. Run `webpi --help` (or `-h`) to print the startup options and exit without starting the server; unknown options exit with an error.
 
-Environment variables keep their upstream `PI_WEB_*` names so existing instructions and wrappers keep working.
+Environment variables keep their upstream `PI_WEB_*` names so that existing instructions and wrappers keep working.
 
 | Option or environment variable | Purpose | Default |
 | --- | --- | --- |
@@ -94,7 +103,7 @@ Environment variables keep their upstream `PI_WEB_*` names so existing instructi
 | `--port <port>`, `-p <port>`, or `PORT` | Server port | `30141` |
 | `--hostname <host>`, `-H <host>`, or `PI_WEB_HOSTNAME` | Bind hostname | `127.0.0.1` |
 | `--no-open` or `PI_WEB_NO_OPEN=1` | Do not open a browser automatically | Browser opens |
-| `PI_WEB_SKIP_VERSION_CHECK=1` | Disable Pi Web update checks | Unset |
+| `PI_WEB_SKIP_VERSION_CHECK=1` | Disable WebPi update checks | Unset |
 | `PI_WEB_ALLOWED_HOSTS` | Additional exact proxy or custom hostnames, comma-separated | Unset |
 | `PI_WEB_PASSWORD` | Enable browser password login; API clients may use Basic Auth with username `pi` | Authentication disabled |
 | `PI_WEB_IDLE_TIMEOUT_MS` | Session idle timeout in milliseconds, up to `2147483647`; `0` disables idle shutdown; invalid or out-of-range values use the default | `600000` (10 min) |
@@ -108,22 +117,22 @@ webpi -p 8080 -H 0.0.0.0 --no-open
 
 ### Startup behaviour
 
-- A WebPi server that already serves the requested port is reused: `webpi` reports its URL and exits instead of starting a second server over the same session files.
-- A port owned by another program is skipped; the launcher tries up to ten consecutive ports and prints the one it used.
+- A WebPi server that already serves the requested port is reused: `webpi` prints its URL and exits instead of starting a second server over the same session files.
+- A port owned by another program is skipped; the launcher tries up to ten consecutive ports and prints the one it used. Ports that Next.js itself refuses are skipped as well.
 - `--port 0` asks the operating system for a free port.
-- The standalone `webpi` command keeps running until you stop it with `Ctrl+C`. A server started from `/webpi` inside pi stops with that pi session; start it from a shell when it must outlive the TUI.
+- The standalone `webpi` command keeps running until you stop it with `Ctrl+C`.
 
-### Remote Access
+### Remote access
 
 Binding to a non-loopback address exposes an agent that can execute high-privilege actions. On a trusted LAN, require a long random password:
 
 ```bash
-PI_WEB_PASSWORD='a-long-random-password' pi-web --hostname 0.0.0.0
+PI_WEB_PASSWORD='a-long-random-password' webpi --hostname 0.0.0.0
 ```
 
-Password authentication does not encrypt the connection. Do not expose Pi Web over plain HTTP to the internet; use HTTPS through a trusted reverse proxy or a trusted VPN. If a reverse proxy sends an external hostname, add that exact name to `PI_WEB_ALLOWED_HOSTS`. This allow-list does not change the address Pi Web binds to.
+Password authentication does not encrypt the connection. Do not expose WebPi over plain HTTP to the internet; use HTTPS through a trusted reverse proxy or a trusted VPN. If a reverse proxy sends an external hostname, add that exact name to `PI_WEB_ALLOWED_HOSTS`. This allow-list does not change the address WebPi binds to.
 
-### HTTP Proxy
+### HTTP proxy
 
 Server-side model and API requests honor the standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment variables.
 
@@ -133,7 +142,7 @@ On macOS or Linux:
 HTTP_PROXY=http://127.0.0.1:7890 \
 HTTPS_PROXY=http://127.0.0.1:7890 \
 NO_PROXY=localhost,127.0.0.1 \
-npx @agegr/pi-web@latest
+webpi
 ```
 
 On Windows PowerShell:
@@ -142,64 +151,17 @@ On Windows PowerShell:
 $env:HTTP_PROXY = "http://127.0.0.1:7890"
 $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 $env:NO_PROXY = "localhost,127.0.0.1"
-npx @agegr/pi-web@latest
+webpi
 ```
 
 ## Notes
 
-- **Agent data**: Pi Web reads pi data from `~/.pi/agent` by default, including session files under `sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`. Set `PI_CODING_AGENT_DIR` to use another pi agent directory.
-- **Filesystem access**: Pi Web must be able to read the agent data directory and the working directories recorded by its sessions. Run Pi Web in the same filesystem environment as pi when sharing existing sessions.
+- **Agent data**: WebPi reads pi data from `~/.pi/agent` by default, including session files under `sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`. Set `PI_CODING_AGENT_DIR` to use another pi agent directory.
+- **Filesystem access**: WebPi must be able to read the agent data directory and the working directories recorded by its sessions. Run it in the same filesystem environment as pi when sharing existing sessions.
 - **Shared configuration**: the Models panel uses pi's model, settings, and credential storage, so changes are visible to both interfaces.
-- **File access boundary**: the file browser is limited to working directories selected in Pi Web and project or session roots it already knows about; it is not a general filesystem browser.
-- **Git worktrees**: see [Worktrees in Pi Web](./docs/worktrees.md) for switcher visibility, worktree creation, and removal behavior.
-
-### Downstream Session Context Menu
-
-Electron wrappers and other downstream integrations can provide a session-row
-context menu without patching `SessionSidebar`. Listen for the cancelable
-`pi-web:session-row-contextmenu` browser event and call `preventDefault()`
-synchronously when the integration will handle it:
-
-```js
-window.addEventListener("pi-web:session-row-contextmenu", (event) => {
-  event.preventDefault();
-  const { id, path, cwd, name, clientX, clientY, refresh } = event.detail;
-
-  void openSessionMenu({ id, path, cwd, name, clientX, clientY }).then((changed) => {
-    if (changed) refresh();
-  });
-});
-```
-
-The detail object contains `id`, `path`, `cwd`, optional `name`, pointer
-coordinates, and a `refresh()` callback for actions that change the session
-list. If no listener cancels the extension event, Pi Web preserves the
-browser's native context menu. This hook is browser-side and independent of
-Pi agent extensions.
-
-### Extension Session Liveness
-
-Server-side Pi extensions with detached work can prevent automatic idle
-session eviction through the versioned global registry:
-
-```js
-const liveness = globalThis[Symbol.for("@agegr/pi-web/session-liveness/v1")];
-const release = liveness?.version === 1
-  ? liveness.register({
-      name: "my-extension",
-      sessionId,
-      sessionFile: sessionFile || undefined,
-      isActive: () => detachedJobs.size > 0,
-    })
-  : () => {};
-```
-
-Register once per active extension session and call the returned idempotent
-`release` function on session shutdown, replacement, or reload. `isActive`
-must be synchronous, cheap, and scoped to the supplied exact session id or
-file. Provider errors fail safe by preserving that session. This lease only
-affects automatic idle eviction; explicit shutdown and Stop fallback cleanup
-still take precedence.
+- **File access boundary**: the file browser is limited to working directories selected in WebPi and project or session roots it already knows about; it is not a general filesystem browser.
+- **Git worktrees**: see [Worktrees in WebPi](./docs/worktrees.md) for switcher visibility, worktree creation, and removal behavior.
+- **Building on WebPi**: wrappers and other downstream builds can hook into the session row context menu and register extension session liveness; see [Downstream integration](./docs/downstream-integration.md).
 
 ## Development
 
@@ -216,9 +178,9 @@ node_modules/.bin/tsc --noEmit
 npm run lint
 ```
 
-Do not run `next build` or `npm run build` during normal development. It writes to `.next/` and can interfere with the development server; leave builds for release work.
+Do not run `next build` or `npm run build` during normal development: it writes to `.next/` and can interfere with the development server. Leave builds for release work.
 
-Contributor guides: [Internationalization](./docs/i18n.md), [Release process](./docs/release.md), and [Upstream sync](./docs/upstream-sync.md).
+Contributor guides: [Upstream sync](./docs/upstream-sync.md) (this fork tracks upstream weekly), [Internationalization](./docs/i18n.md), and [Release process](./docs/release.md).
 
 ## Repository Layout
 

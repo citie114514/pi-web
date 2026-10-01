@@ -1,80 +1,140 @@
-# Pi Web
+# WebPi
 
 [English](./README.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-> 本文档描述上游 pi-web 的功能。WebPi 的安装与启动方式见 [README.md](./README.md) 与 [docs/webpi.md](./docs/webpi.md)。
+WebPi 是 [pi 编程智能体](https://github.com/earendil-works/pi)的本地浏览器界面，装好即可使用。它读取与 pi 相同的配置、凭据与会话文件，所以在终端里开始的对话能在浏览器里打开，在浏览器里聊的也能回到终端继续。浏览和继续会话、运行智能体、配置模型与资源、查看项目文件，全部在本机浏览器窗口里完成。
 
-[pi 编程智能体](https://github.com/earendil-works/pi)的本地浏览器界面。Pi Web 与 pi 共用本机配置和会话文件，可在浏览器中查找和继续对话、运行智能体、配置模型与资源，并查看项目文件。
+![WebPi 起始界面：会话侧边栏、Get Started 面板，以及底部的模型、技能与设置入口](./docs/screenshot.png)
 
-**[在线体验演示 →](https://agegr.github.io/pi-web/)**：真实的 Pi Web 界面直接在浏览器里运行，带有示例会话、文件和模型。无需安装；回复都是预设内容，不会调用任何模型。
+三种用法，共用同一份 pi 数据（会话与凭据都在 `~/.pi/agent`），所以无论用哪种，看到的都是同一批对话。
 
-中文微信群：请查看 [GitHub Discussions 帖子](https://github.com/agegr/pi-web/discussions/271)。
+| 用法 | 适用场景 | 需要准备 |
+| --- | --- | --- |
+| [**桌面应用**](#桌面应用) | 想要一个能双击打开的窗口和托盘图标，服务随应用启停 | 除下载外不需要任何依赖，自带 Node.js |
+| [**`webpi` 命令**](#webpi-命令) | 想要一个能用任意浏览器访问、也可无界面运行的服务 | Node.js 22.19.0 或更高版本 |
+| [**Pi 包**](#作为-pi-包) | 已经在 pi 会话里，希望用 `/webpi` 直接调出界面 | pi |
 
-![Pi Web 展示包含结构化 Markdown、工具调用和项目导航的 pi 会话](https://raw.githubusercontent.com/agegr/pi-web/main/docs/screenshot2.png)
+WebPi 是 [pi-web](https://github.com/agegr/pi-web) 的下游构建：应用本体是上游的工作，本仓库增加了 `webpi` 命令、桌面应用、Pi 包、对 Windows 更友好的启动流程，以及 WebPi 品牌。差异细节见 [docs/webpi.md](./docs/webpi.md)，桌面端见 [docs/webpi-desktop.md](./docs/webpi-desktop.md)，上游合并机制见 [docs/upstream-sync.md](./docs/upstream-sync.md)，fork 起点见 [docs/upstream-inventory.md](./docs/upstream-inventory.md)。
 
 ## 功能
 
-- **会话工作区**：按项目查找、继续、重命名、导出和删除对话，并查看运行状态、上下文占用、花费和压缩信息。
-- **两种分支方式**：**新会话**会从较早的消息创建独立会话文件；**从此处编辑**会在当前会话内创建分支。
-- **项目文件工具**：浏览和上传文件、查看 Git Diff，并预览源码、Markdown、图片、音频、PDF 和 DOCX；文件变化后会自动刷新。
-- **Git worktree**：从侧边栏切换 checkout，同时把同一仓库不同 worktree 的会话归在一起。
-- **网页配置**：无需离开 Pi Web，即可管理 Provider 登录和 API Key、模型、模型测试、插件包及技能。
-- **英文、简体中文和繁体中文界面**：Pi Web 首次打开时跟随浏览器语言，也可从顶部栏切换语言。
+- **会话工作区**：按项目分组浏览、继续、重命名、导出和删除对话，并显示运行状态、上下文占用、费用与压缩信息。
+- **两种分支方式**：**新建会话**从某条历史消息派生独立的会话文件；**从此处编辑**在当前会话内创建分支。
+- **项目文件工具**：浏览与上传文件、查看 Git 差异，预览源码、Markdown、图片、音频、PDF 与 DOCX，并自动刷新。
+- **Git worktree**：在侧边栏切换检出目录，同一仓库的会话仍归为一组。
+- **网页端配置**：登录 provider、管理 API Key、模型、模型测试、插件包与技能，无需离开浏览器。
+- **中／英／繁三语界面**：初始跟随浏览器语言，顶栏可随时切换。
 
 ## 快速开始
 
-Pi Web 要求 Node.js 22.19.0 或更高版本。先用 `node --version` 检查版本，然后运行：
+### 桌面应用
+
+到[发布页](https://github.com/citie114514/pi-web/releases/latest)下载对应平台的构建并运行即可。启动应用就是启动 WebPi 服务，退出应用就是停止该服务，不需要另外安装任何东西。
+
+| 平台 | 安装包 | 便携版 |
+| --- | --- | --- |
+| Windows x64 | `WebPi-Setup-<版本>-x64.exe`（按用户安装，不需要管理员权限） | `WebPi-Portable-<版本>-x64.exe`、`WebPi-<版本>-win-x64-portable.zip` |
+| Linux x64 | `WebPi-<版本>-linux-x86_64.AppImage`、`WebPi-<版本>-linux-amd64.deb` | `WebPi-<版本>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi-<版本>-linux-arm64.AppImage`、`WebPi-<版本>-linux-arm64.deb` | `WebPi-<版本>-linux-arm64-portable.zip` |
+| macOS x64 / arm64 | `WebPi-Setup-<版本>-<arch>.dmg` | `WebPi-<版本>-mac-<arch>-portable.zip` |
+
+应用与服务的关系、便携模式与签名提示见 [桌面应用](#桌面应用)。
+
+### `webpi` 命令
+
+需要 Node.js 22.19.0 或更高版本。先用 `node --version` 确认，然后把本仓库安装为全局命令：
 
 ```bash
-npx @agegr/pi-web@latest
+git clone https://github.com/citie114514/pi-web
+cd pi-web
+npm install
+npm run build
+npm install -g .
+webpi
 ```
 
-服务就绪后，命令行会尝试自动打开浏览器。如果没有打开，请访问 [http://127.0.0.1:30141](http://127.0.0.1:30141)。Pi Web 默认仅监听 `127.0.0.1`。
+服务就绪后 `webpi` 会尝试自动打开浏览器；如果没有打开，请访问它打印的地址，默认是 [http://127.0.0.1:30141](http://127.0.0.1:30141)。WebPi 默认只监听 `127.0.0.1`。之后可用 `npm uninstall -g webpi` 卸载。
 
-如果尚未配置模型 Provider，请打开**模型（Models）**面板登录或添加 API Key。
+### 作为 Pi 包
 
-如需全局安装 `pi-web` 命令：
+把本目录安装为 Pi 包，即可在 pi 里启动服务：
 
 ```bash
-npm install -g @agegr/pi-web@latest
-pi-web
+pi install /path/to/pi-web
 ```
 
-更新前先用 `Ctrl+C` 停止正在运行的进程，再次执行同一条安装命令。卸载时运行 `npm uninstall -g @agegr/pi-web`。
+然后在 pi 的 TUI 里运行 `/webpi` 启动服务并拿到地址。`/webpi --port 8080` 会把参数转给同一个启动器。这种方式启动的服务会随该 pi 会话结束而停止；需要它在 TUI 退出后继续运行时，请用 shell 或桌面应用启动。
+
+### 配置模型
+
+如果还没有配置模型 provider，打开**模型（Models）**面板登录或添加 API Key。该面板直接使用 pi 的模型、设置与凭据存储，所以无论你在哪个界面修改，另一个界面都能看到；在 pi CLI 里运行 `/login` 写入的是同一份凭据。
+
+如果你只想要上游、不需要这层打包，上游发布的包仍是 `npx @agegr/pi-web@latest`。
+
+## 桌面应用
+
+桌面版就是同一个应用装在独立窗口里，带托盘图标和完整的生命周期：
+
+- **启动应用即启动服务，退出应用即停止服务。** 不是本应用启动的服务不会被停掉：如果该端口上已有另一个 WebPi，应用会另起一个使用空闲端口的实例，保证退出时不会误伤别人。
+- **关闭窗口时会询问怎么处理**——最小化到托盘，或直接关闭——并可记住选择，之后可在托盘菜单里随时改回。
+- **托盘菜单**还能显示／隐藏窗口、重启服务、退出应用。服务意外退出时会弹窗，可选择重启或退出。
+- **便携模式**：便携版把设置保存在解压目录内，整个文件夹可以拷到 U 盘使用；pi 自身的数据仍在 `~/.pi/agent`。
+
+构建未做代码签名，因此 Windows SmartScreen 与 macOS Gatekeeper 首次运行会告警；告警的处理方式、便携模式、签名配置与 CI 发布流程见 [docs/webpi-desktop.md](./docs/webpi-desktop.md)。
+
+从源码构建：
+
+```bash
+npm run desktop          # 以源码方式运行
+npm run desktop:dist     # 构建本平台的安装包与便携版
+```
+
+产物在 `release/` 目录。`.github/workflows/desktop-release.yml` 会在每个平台构建、真实启动产物验证可用，并发布 Release。
 
 ## 配置
 
-端口和主机名以命令行参数为准，优先于对应的环境变量。`--no-open` 与 `PI_WEB_NO_OPEN=1` 中任意一个都会关闭自动打开浏览器。运行 `pi-web --help`（或 `-h`）可打印启动选项并以退出码 0 结束，不会启动服务；未知参数会报错并以退出码 1 结束。
+端口与主机名以命令行参数为准，优先于对应环境变量。`--no-open` 与 `PI_WEB_NO_OPEN=1` 中任意一个都会关闭自动打开浏览器。运行 `webpi --help`（或 `-h`）可打印启动选项并以退出码 0 结束，不会启动服务；未知参数会报错退出。
 
-| 参数或环境变量 | 用途 | 默认值 |
+环境变量沿用上游的 `PI_WEB_*` 名称，已有的说明和封装脚本无需改动。
+
+| 选项或环境变量 | 作用 | 默认值 |
 | --- | --- | --- |
 | `--help`、`-h` | 打印启动选项并退出 | — |
 | `--port <端口>`、`-p <端口>` 或 `PORT` | 服务端口 | `30141` |
-| `--hostname <主机>`、`-H <主机>` 或 `PI_WEB_HOSTNAME` | 监听主机名 | `127.0.0.1` |
+| `--hostname <主机>`、`-H <主机>` 或 `PI_WEB_HOSTNAME` | 绑定主机名 | `127.0.0.1` |
 | `--no-open` 或 `PI_WEB_NO_OPEN=1` | 不自动打开浏览器 | 自动打开 |
-| `PI_WEB_ALLOWED_HOSTS` | 额外允许的代理或自定义主机名，多个值用逗号分隔，必须精确匹配 | 未设置 |
-| `PI_WEB_PASSWORD` | 启用浏览器密码登录；API 客户端可使用用户名为 `pi` 的 Basic Auth | 不启用认证 |
+| `PI_WEB_SKIP_VERSION_CHECK=1` | 关闭 WebPi 更新检查 | 未设置 |
+| `PI_WEB_ALLOWED_HOSTS` | 额外允许的精确代理或自定义主机名，逗号分隔 | 未设置 |
+| `PI_WEB_PASSWORD` | 启用浏览器密码登录；API 客户端可用用户名 `pi` 走 Basic Auth | 不启用认证 |
+| `PI_WEB_IDLE_TIMEOUT_MS` | 会话空闲超时（毫秒），上限 `2147483647`；`0` 表示不因空闲关闭；非法或越界值按默认处理 | `600000`（10 分钟） |
 
 例如：
 
 ```bash
-pi-web --help
-pi-web -p 8080 -H 0.0.0.0 --no-open
+webpi --help
+webpi -p 8080 -H 0.0.0.0 --no-open
 ```
+
+### 启动行为
+
+- 若目标端口上已有 WebPi 服务，会直接复用它：`webpi` 打印其地址并以退出码 0 结束，不会在同一批会话文件上再起一个服务。
+- 端口被其他程序占用时会跳过，最多顺延尝试十个连续端口并打印实际使用的端口；Next.js 自身拒绝的保留端口也会跳过。
+- `--port 0` 表示让操作系统分配一个空闲端口。
+- 独立运行的 `webpi` 命令会一直运行，直到你用 `Ctrl+C` 停止。
 
 ### 远程访问
 
-监听非回环地址会暴露一个可执行高权限操作的智能体。在可信局域网中使用时，请设置足够长的随机密码：
+绑定到非回环地址等于把一个能执行高权限操作的智能体暴露出去。在可信局域网内，请设置足够长的随机密码：
 
 ```bash
-PI_WEB_PASSWORD='足够长的随机密码' pi-web --hostname 0.0.0.0
+PI_WEB_PASSWORD='一个很长的随机密码' webpi --hostname 0.0.0.0
 ```
 
-密码认证不会加密连接。不要通过明文 HTTP 将 Pi Web 暴露到互联网；远程访问应使用可信反向代理提供 HTTPS，或通过可信 VPN。如果反向代理传递外部主机名，请把该名称精确加入 `PI_WEB_ALLOWED_HOSTS`。这个白名单不会改变 Pi Web 的监听地址。
+密码认证不会加密连接。不要把 WebPi 以明文 HTTP 暴露到公网；请通过可信反向代理或 VPN 走 HTTPS。如果反向代理会转发外部主机名，把该精确主机名加入 `PI_WEB_ALLOWED_HOSTS`。这个白名单不会改变 WebPi 实际绑定的地址。
 
 ### HTTP 代理
 
-服务端的模型和 API 请求会读取标准的 `HTTP_PROXY`、`HTTPS_PROXY` 和 `NO_PROXY` 环境变量。
+服务端的模型与 API 请求遵循标准的 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY` 环境变量。
 
 macOS 或 Linux：
 
@@ -82,7 +142,7 @@ macOS 或 Linux：
 HTTP_PROXY=http://127.0.0.1:7890 \
 HTTPS_PROXY=http://127.0.0.1:7890 \
 NO_PROXY=localhost,127.0.0.1 \
-npx @agegr/pi-web@latest
+webpi
 ```
 
 Windows PowerShell：
@@ -91,16 +151,17 @@ Windows PowerShell：
 $env:HTTP_PROXY = "http://127.0.0.1:7890"
 $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 $env:NO_PROXY = "localhost,127.0.0.1"
-npx @agegr/pi-web@latest
+webpi
 ```
 
 ## 注意事项
 
-- **智能体数据**：Pi Web 默认读取 `~/.pi/agent` 下的 pi 数据，包括 `sessions/<编码后的工作目录>/<时间戳>_<uuid>.jsonl` 中的会话文件。可通过 `PI_CODING_AGENT_DIR` 指定其他 pi agent 目录。
-- **文件系统访问**：Pi Web 必须能读取智能体数据目录及会话记录中的工作目录。与现有 pi 会话共用数据时，请让 Pi Web 运行在与 pi 相同的文件系统环境中。
-- **共享配置**：模型面板使用 pi 的模型、设置和凭据存储，因此两种界面都能看到相关更改。
-- **文件访问边界**：文件浏览器仅能访问在 Pi Web 中选择过的工作目录，以及它已识别的项目或会话根目录；它不是通用的文件系统浏览器。
-- **Git worktree**：切换器何时显示、如何创建 worktree，以及删除会产生什么影响，见 [Pi Web 里的 Worktree](./docs/worktrees.zh-CN.md)。
+- **智能体数据**：WebPi 默认从 `~/.pi/agent` 读取 pi 数据，会话文件位于 `sessions/<编码后的工作目录>/<时间戳>_<uuid>.jsonl`。设置 `PI_CODING_AGENT_DIR` 可改用其他 pi 智能体目录。
+- **文件系统权限**：WebPi 必须能读取智能体数据目录以及会话记录过的工作目录。需要复用已有会话时，请让 WebPi 与 pi 处于同一文件系统环境。
+- **共用配置**：模型面板使用 pi 的模型、设置与凭据存储，改动对两个界面同时生效。
+- **文件访问边界**：文件浏览器只能在 WebPi 中选择的工作目录，以及它已知的项目或会话根目录内活动，它不是通用的文件系统浏览器。
+- **Git worktree**：切换器可见性、worktree 的创建与删除行为见 [WebPi 中的 worktree](./docs/worktrees.zh-CN.md)。
+- **基于 WebPi 二次开发**：封装项目可挂接会话行右键菜单与扩展会话存活租约，见 [下游集成接口](./docs/downstream-integration.md)。
 
 ## 开发
 
@@ -109,7 +170,7 @@ npm install
 npm run dev
 ```
 
-开发服务器运行在 [http://127.0.0.1:30141](http://127.0.0.1:30141)。常用检查命令：
+开发服务器运行在 [http://127.0.0.1:30141](http://127.0.0.1:30141)。常用检查：
 
 ```bash
 npm test
@@ -117,25 +178,28 @@ node_modules/.bin/tsc --noEmit
 npm run lint
 ```
 
-日常开发时不要运行 `next build` 或 `npm run build`。它们会写入 `.next/`，可能干扰开发服务器；仅在发布流程中执行构建。
+日常开发中不要运行 `next build` 或 `npm run build`：它会写入 `.next/`，可能干扰开发服务器。构建留给发布环节。
 
-贡献者文档：[国际化](./docs/i18n.md)和[发布流程](./docs/release.md)。
+贡献者文档：[上游同步](./docs/upstream-sync.md)（本 fork 每周跟踪上游）、[国际化](./docs/i18n.md)、[发布流程](./docs/release.md)。
 
 ## 仓库结构
 
 ```text
-app/             Next.js 界面和 API 路由
+app/             Next.js 界面与 API 路由
 components/      React 界面组件
-hooks/           客户端状态和交互 hooks
-lib/             会话、智能体、模型、文件、Git 和安全逻辑
-public/          静态资源和 PWA 文件
-bin/             npm CLI 入口及启动参数解析
-docs/            面向用户和贡献者的专题文档
-demo/            发布到 GitHub Pages 的静态演示站（见 demo/README.md）
+hooks/           客户端状态与交互逻辑
+lib/             会话、智能体、模型、文件、Git 与安全逻辑
+public/          静态资源与 PWA 文件
+bin/             npm CLI 入口、启动参数解析、启动端口选择
+desktop/         Electron 外壳：窗口、托盘、服务生命周期、打包
+extensions/      Pi 包扩展，提供 /webpi 命令
+skills/          Pi 包技能
+docs/            面向使用者与贡献者的专题文档
+demo/            发布到 GitHub Pages 的静态演示（见 demo/README.md）
 ```
 
-架构说明和详细文件地图见 [AGENTS.md](./AGENTS.md)。
+架构说明与详细文件地图见 [AGENTS.md](./AGENTS.md)。
 
 ## 许可证
 
-[MIT](./LICENSE)
+[MIT](./LICENSE)。保留上游版权与署名；WebPi 是 [pi-web](https://github.com/agegr/pi-web) 的下游构建。
