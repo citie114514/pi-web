@@ -29,6 +29,16 @@ To run it immediately:
 gh workflow run upstream-sync.yml --repo citie114514/pi-web --ref main
 ```
 
+Two things to know about the automated run:
+
+- The pull request is created with the repository's `GITHUB_TOKEN`, and GitHub
+  does not start workflow runs for events triggered by that token. So the CI
+  checks will **not** appear on the sync pull request by itself; run the
+  checklist locally, or push any commit to the branch to wake them up.
+- GitHub disables `schedule` triggers in a repository that has had no activity
+  for 60 days. If the weekly run silently stops, re-enable it from the Actions
+  tab or dispatch it manually.
+
 ## Doing it by hand
 
 The same steps, when the automated merge conflicts or you want to control it:
