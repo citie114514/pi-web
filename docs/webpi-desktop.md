@@ -47,7 +47,6 @@ a combined one for every published file.
 A portable build must not write to `%APPDATA%` or `Application Support`, so it
 keeps its settings next to the executable and the whole folder can be copied to
 a USB stick. `desktop/portable.js` resolves the data directory in this order:
-
 1. `WEBPI_DESKTOP_DATA_DIR` — explicit override;
 2. `PORTABLE_EXECUTABLE_DIR` — set by the single-file Windows portable build →
    `<that folder>/data`;
@@ -85,6 +84,15 @@ these targets: build each platform on its own machine or CI runner.
 macOS x64/arm64 on the matching runners, uploads the artifacts, and publishes a
 GitHub Release with `SHA256SUMS.txt` for `v*` tags.
 
+The workflow passes one architecture per runner (`--x64` or `--arm64`) and hands
+that value to the packaging step as `WEBPI_PORTABLE_ARCH`. That is not
+redundant: electron-builder omits the architecture from the output folder name
+when it matches the host, so `--x64` on an arm64 runner still writes
+`linux-unpacked`. Without the hint, two architectures would produce the same
+archive name. `desktop/portable.js` otherwise falls back to reading the
+architecture from the packaged executable's ELF, Mach-O, or PE header, and
+`desktop/make-portable.mjs` refuses to run if two folders would share a name.
+
 Notes that matter when packaging:
 
 - `asar` is **disabled**. The server runs as a separate process (`next start`)
@@ -117,7 +125,7 @@ node --experimental-strip-types --test lib/desktop-*.test.mjs
 
 They pin the close-button policy, the tray menu, the launcher command and
 runtime selection, the readiness contract, tree-kill on stop, the settings file,
-and portable data-directory resolution.
+portable data-directory resolution, and how each packaging folder is named.
 
 For an end-to-end check without clicking anything, the shell supports a smoke
 mode that starts the app, waits for the UI, captures a screenshot, and quits:

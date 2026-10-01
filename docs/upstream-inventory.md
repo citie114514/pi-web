@@ -51,8 +51,8 @@ plus Playwright E2E on Node 22.19.0. `.github/workflows/demo-pages.yml` builds
 `npm test` reported **1307 tests, 1295 passing, 9 failing** before any change
 in this fork. After the WebPi packaging layer and the desktop shell added tests
 (port selection, package contract, close policy, tray menu, service supervisor,
-desktop settings, portable resolution, packaging config), it reports **1380
-tests, 1369 passing, 9 failing, 2 skipped** — the same pre-existing failures,
+desktop settings, portable resolution, packaging config), it reports **1384
+tests, 1373 passing, 9 failing, 2 skipped** — the same pre-existing failures,
 no new ones:
 
 - `only the active file tab mounts a FileViewer`
@@ -77,9 +77,16 @@ The Windows artifact set was built and exercised on this machine
 (`electron-builder --win`): NSIS installer, single-file portable, and the
 portable zip. A packaged build starts its own service, loads the UI, and releases
 the port when the app quits; a portable build writes its settings into the
-extracted folder. Linux and macOS targets are configured and built by
-`.github/workflows/desktop-release.yml`; they were not built locally because
-cross-building is not supported.
+extracted folder.
+
+Linux and macOS are built by `.github/workflows/desktop-release.yml` on real
+runners. The first CI run filed two bugs that a Windows-only check could not see:
+electron-builder omits the architecture suffix when it matches the host, and
+per-target `arch` arrays in the config overrode the CLI flags, so both Linux jobs
+built both architectures and their identically named portable zips overwrote each
+other. Both are fixed (the arch now comes from the folder or the executable
+header, plus a duplicate-name guard, and the workflow passes the arch); the run
+that follows this commit is the verification.
 
 ## Configuration and data touched at runtime
 

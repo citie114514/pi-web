@@ -160,7 +160,14 @@ function createWindow() {
 }
 
 function createTray() {
-  tray = new Tray(trayIcon());
+  try {
+    tray = new Tray(trayIcon());
+  } catch (error) {
+    // Some Linux desktops have no StatusNotifier host; the window still works,
+    // so a missing tray must not take the application down.
+    logLine(`[desktop] tray unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
   tray.setToolTip(PRODUCT);
   tray.on("click", () => toggleWindow());
   updateTrayMenu();
