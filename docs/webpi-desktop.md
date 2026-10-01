@@ -84,8 +84,22 @@ Per-platform shortcuts: `desktop:dist:win`, `desktop:dist:linux`,
 these targets: build each platform on its own machine or CI runner.
 
 `.github/workflows/desktop-release.yml` builds Windows x64, Linux x64/arm64, and
-macOS x64/arm64 on the matching runners, uploads the artifacts, and publishes a
-GitHub Release with `SHA256SUMS.txt` for `v*` tags.
+macOS x64/arm64 on the matching runners, starts each packaged artifact to verify
+it boots, uploads the artifacts, and publishes a GitHub Release with every
+archive plus `SHA256SUMS.txt`.
+
+The workflow runs on a `v*` tag, on pull requests that touch the desktop shell or
+the build config, and on demand. To cut a release:
+
+```bash
+git tag -a v0.9.3-webpi.1 -m "WebPi Desktop 0.9.3"
+git push origin v0.9.3-webpi.1
+```
+
+Upstream already owns `v<version>` tags (`v0.9.3` points at the upstream release
+commit, which has no desktop shell), so this fork publishes under
+`v<version>-webpi.<n>` instead of overwriting them. The release name is
+`WebPi Desktop <tag>`.
 
 The workflow passes one architecture per runner (`--x64` or `--arm64`) and hands
 that value to the packaging step as `WEBPI_PORTABLE_ARCH`. That is not
