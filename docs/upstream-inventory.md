@@ -41,6 +41,7 @@ merge and update this file when the facts change.
 | Unit tests | `npm test` (node test runner over `app/`, `components/`, `hooks/`, `lib/`, `public/`) |
 | E2E (Playwright) | `npm run test:e2e`, `npm run test:terminal` |
 | Desktop app (Windows/Linux/macOS) | `npm run desktop` (source) / `npm run desktop:dist` (installer + portable) / `npm run desktop:portable` (marker + zip + SHA256SUMS) |
+| Upstream sync | `.github/workflows/upstream-sync.yml` (weekly) — see `docs/upstream-sync.md` |
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests, then a build
 plus Playwright E2E on Node 22.19.0. `.github/workflows/demo-pages.yml` builds
@@ -51,9 +52,9 @@ plus Playwright E2E on Node 22.19.0. `.github/workflows/demo-pages.yml` builds
 `npm test` reported **1307 tests, 1295 passing, 9 failing** before any change
 in this fork. After the WebPi packaging layer and the desktop shell added tests
 (port selection, package contract, close policy, tray menu, service supervisor,
-desktop settings, portable resolution, packaging config), it reports **1384
-tests, 1373 passing, 9 failing, 2 skipped** — the same pre-existing failures,
-no new ones:
+desktop settings, portable resolution, packaging config), and after merging 36
+upstream commits (pi 0.87.1 → 0.99.1), it reports **1569 tests, 1553 passing, 9
+failing, 7 skipped** — the same pre-existing failures, no new ones:
 
 - `only the active file tab mounts a FileViewer`
 - `the active viewer restores tab state and saves it with a revision`

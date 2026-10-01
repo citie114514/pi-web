@@ -4,7 +4,7 @@
 
 Local browser UI for the [pi coding agent](https://github.com/earendil-works/pi). WebPi uses the same local configuration and session files as pi, so you can browse and resume conversations, run agent turns, configure models and resources, and inspect project files from a browser.
 
-WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application is upstream, this project adds the `webpi` command, the WebPi desktop application, the Pi package (`/webpi`), Windows-clean startup, and the WebPi name. This fork lives at <https://github.com/citie114514/pi-web>. See [docs/webpi.md](./docs/webpi.md) for exactly what differs, [docs/webpi-desktop.md](./docs/webpi-desktop.md) for the desktop build, and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline it was forked from.
+WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application is upstream, this project adds the `webpi` command, the WebPi desktop application, the Pi package (`/webpi`), Windows-clean startup, and the WebPi name. This fork lives at <https://github.com/citie114514/pi-web>. See [docs/webpi.md](./docs/webpi.md) for exactly what differs, [docs/webpi-desktop.md](./docs/webpi-desktop.md) for the desktop build, [docs/upstream-sync.md](./docs/upstream-sync.md) for how upstream changes are merged, and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline it was forked from.
 
 **[Try the interactive demo →](https://agegr.github.io/pi-web/)** The real Pi Web UI runs entirely in your browser, with sample sessions, files and models. There is nothing to install; replies are pre-written and no model is called.
 
@@ -218,7 +218,7 @@ npm run lint
 
 Do not run `next build` or `npm run build` during normal development. It writes to `.next/` and can interfere with the development server; leave builds for release work.
 
-Contributor guides: [Internationalization](./docs/i18n.md) and [Release process](./docs/release.md).
+Contributor guides: [Internationalization](./docs/i18n.md), [Release process](./docs/release.md), and [Upstream sync](./docs/upstream-sync.md).
 
 ## Repository Layout
 

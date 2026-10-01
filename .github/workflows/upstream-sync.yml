@@ -1,0 +1,180 @@
+name: Upstream sync
+
+# Merges agegr/pi-web into this fork.
+#
+#   no new commits  -> the job exits without doing anything
+#   clean merge     -> force-pushes the `upstream-sync` branch and opens a PR
+#   conflicting one -> opens (or updates) a single issue listing the files that
+#                      need to be resolved by hand
+#
+# Nothing is ever merged into main automatically: the pull request is a place to
+# run the build, the tests, and the desktop smoke check first.
+on:
+  schedule:
+    # Mondays at 03:00 UTC.
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  SYNC_BRANCH: upstream-sync
+  UPSTREAM_REPO: agegr/pi-web
+
+jobs:
+  sync:
+    name: Merge upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          # The merge base and the commit list need the full history.
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" 2>/dev/null || true
+          git fetch --no-tags upstream main
+
+      - name: Count new upstream commits
+        id: behind
+        run: |
+          count=$(git rev-list --count HEAD..upstream/main)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "upstream is $count commit(s) ahead of main"
+
+      - name: Try the merge
+        id: merge
+        if: steps.behind.outputs.count != '0'
+        run: |
+          if git merge --no-commit --no-ff upstream/main > /tmp/merge.log 2>&1; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+            echo "Clean merge; the working tree is staged."
+            exit 0
+          fi
+
+          echo "status=conflict" >> "$GITHUB_OUTPUT"
+          git diff --name-only --diff-filter=U | sort > /tmp/conflicts.txt
+          {
+            echo "conflicts<<EOF"
+            cat /tmp/conflicts.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Conflicting files:"
+          cat /tmp/conflicts.txt
+          git merge --abort
+
+      - name: Open a pull request for a clean merge
+        if: steps.merge.outputs.status == 'clean'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          upstream_head=$(git rev-parse --short upstream/main)
+          count=${{ steps.behind.outputs.count }}
+
+          git checkout -B "$SYNC_BRANCH"
+          printf 'chore(上游): 合并上游 main（%s 个提交，至 %s）\n\n由 .github/workflows/upstream-sync.yml 自动生成，合并前请先跑通构建、测试与桌面端自检。\n' \
+            "$count" "$upstream_head" > /tmp/commit-msg.txt
+          git commit -q -F /tmp/commit-msg.txt
+          git push --force origin "$SYNC_BRANCH"
+
+          {
+            echo "把 \`${UPSTREAM_REPO}\` 的 ${count} 个提交合并进本 fork（upstream/main 到 \`${upstream_head}\`）。"
+            echo
+            echo "自动合并**没有冲突**，但合并干净不代表能跑，请先验证："
+            echo
+            echo '```bash'
+            echo "npm install"
+            echo "npm run build"
+            echo "npm test          # 期望只有既有的 Windows 失败项"
+            echo "npm run lint"
+            echo 'WEBPI_DESKTOP_SMOKE=1 npx electron desktop/main.js   # 期望 owned=true, title=WebPi'
+            echo '```'
+            echo
+            echo "重点确认本 fork 的东西没被上游覆盖（测试已覆盖大部分）："
+            echo
+            echo "- \`package.json\`：\`name\`/\`bin.webpi\`/\`pi\`/\`main\`/\`build\`/\`desktop:*\` 脚本与 pi SDK 版本"
+            echo "- 品牌文案：\`app/layout.tsx\`、\`app/manifest.ts\`、\`lib/i18n/messages/*\`、\`components/ChatWindow.tsx\`"
+            echo "- 启动契约：\`WebPi ready at <url>\` / \`WebPi is already running at <url>\`（启动器、Pi 扩展、桌面端三处必须一致）"
+            echo "- \`bin/port-selection.js\` 的保留端口表要与 \`next/dist/lib/helpers/get-reserved-port\` 一致"
+            echo
+            echo "上游提交："
+            echo
+            echo '```'
+            git log --oneline --no-decorate HEAD~1..upstream/main 2>/dev/null | head -40 || true
+            echo '```'
+          } > /tmp/pr-body.md
+
+          if gh pr list --state open --head "$SYNC_BRANCH" --json number --jq '.[0].number' | grep -q .; then
+            echo "An open pull request already tracks $SYNC_BRANCH; it now points at the new commit."
+          else
+            gh pr create \
+              --base main \
+              --head "$SYNC_BRANCH" \
+              --title "chore(上游): 合并上游 main（${count} 个提交）" \
+              --body-file /tmp/pr-body.md
+          fi
+
+      - name: Report conflicts in an issue
+        if: steps.merge.outputs.status == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONFLICTS: ${{ steps.merge.outputs.conflicts }}
+        run: |
+          set -euo pipefail
+          gh label create upstream-sync --color FBCA04 \
+            --description "Upstream merge needs manual conflict resolution" --force
+
+          count=${{ steps.behind.outputs.count }}
+          upstream_head=$(git rev-parse --short upstream/main)
+
+          {
+            echo "合并 \`${UPSTREAM_REPO}\` 的 ${count} 个提交（upstream/main 到 \`${upstream_head}\`）时产生冲突，需要手工解决。"
+            echo
+            echo "冲突文件："
+            echo
+            echo '```'
+            echo "$CONFLICTS"
+            echo '```'
+            echo
+            echo "本地解决："
+            echo
+            echo '```bash'
+            echo "git fetch upstream"
+            echo "git checkout -b upstream-sync-manual main"
+            echo "git merge upstream/main        # 逐个解决上面这些文件"
+            echo "npm install && npm run build && npm test"
+            echo '```'
+            echo
+            echo "解完把分支推上来开 PR，或直接合入 main。合并后请确认本 fork 的改动仍在："
+            echo "\`package.json\` 的 WebPi 字段与 desktop 脚本、品牌文案、"
+            echo "\`WebPi ready at <url>\` 启动契约、\`bin/port-selection.js\` 的保留端口表。"
+            echo
+            echo "_此 issue 由 \`.github/workflows/upstream-sync.yml\` 自动维护，下次冲突时会更新内容。_"
+          } > /tmp/issue-body.md
+
+          existing=$(gh issue list --label upstream-sync --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file /tmp/issue-body.md
+            gh issue comment "$existing" --body "上游又有新提交（${count} 个，至 \`${upstream_head}\`），冲突清单已更新。"
+          else
+            gh issue create \
+              --title "chore(上游): 合并上游 main 需要手工解决冲突" \
+              --label upstream-sync \
+              --body-file /tmp/issue-body.md
+          fi
