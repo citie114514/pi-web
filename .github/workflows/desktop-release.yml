@@ -122,6 +122,7 @@ jobs:
             | sort -z | xargs -0 sha256sum | tee SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
+          name: WebPi Desktop ${{ github.ref_name }}
           files: |
             artifacts/*.exe
             artifacts/*.dmg
