@@ -50,21 +50,37 @@ To uninstall the global command, run `npm uninstall -g webpi`.
 
 ## Desktop application
 
-The same application also runs as a standalone desktop app: its own window and
-tray icon, and a real lifecycle — starting the app starts the WebPi service, and
-quitting it stops that service. Closing the window asks whether to minimize to
-the tray or to close everything, and can remember the answer.
+WebPi also runs as a standalone desktop app: its own window and tray icon, and a
+real lifecycle — starting the app starts the WebPi service, and quitting the app
+stops that service. Closing the window asks whether to minimize to the tray or to
+close everything, and can remember the answer.
+
+Download a build from the [releases page](https://github.com/citie114514/pi-web/releases/latest):
+
+| Platform | Installer | Portable |
+| --- | --- | --- |
+| Windows x64 | `WebPi-Setup-<version>-x64.exe` (per-user, no administrator) | `WebPi-Portable-<version>-x64.exe`, `WebPi-<version>-win-x64-portable.zip` |
+| Linux x64 | `WebPi-<version>-linux-x86_64.AppImage`, `WebPi-<version>-linux-amd64.deb` | `WebPi-<version>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi-<version>-linux-arm64.AppImage`, `WebPi-<version>-linux-arm64.deb` | `WebPi-<version>-linux-arm64-portable.zip` |
+| macOS x64 / arm64 | `WebPi-Setup-<version>-<arch>.dmg` | `WebPi-<version>-mac-<arch>-portable.zip` |
+
+The packaged app runs its server with Electron's own Node.js, so it does not need
+Node.js installed. The builds are not signed, so Windows SmartScreen and macOS
+Gatekeeper warn on first launch. The portable archives keep their settings inside
+the extracted folder, so the whole folder can be moved to a USB stick; see
+[docs/webpi-desktop.md](./docs/webpi-desktop.md) for portable mode, the signing
+warnings, and how to build or publish a release.
+
+To build it yourself:
 
 ```bash
 npm run desktop          # run from source
 npm run desktop:dist     # installer + portable for this platform
 ```
 
-Artifacts land in `release/`: a Windows installer (NSIS, per-user) plus a
-single-file portable, AppImage and `.deb` for Linux, a `.dmg` for macOS, and a
-portable `.zip` per platform that keeps its settings inside the extracted folder.
-See [docs/webpi-desktop.md](./docs/webpi-desktop.md) for portable mode, signing
-notes, and the CI workflow.
+Artifacts land in `release/`. `.github/workflows/desktop-release.yml` builds every
+platform, starts each packaged artifact to verify it boots, and publishes the
+release.
 
 ## Configuration
 

@@ -83,6 +83,25 @@ Per-platform shortcuts: `desktop:dist:win`, `desktop:dist:linux`,
 `desktop:dist:mac`. Cross-building is not supported by electron-builder for
 these targets: build each platform on its own machine or CI runner.
 
+### Desktop shortcut
+
+The Windows installer creates a desktop and Start Menu shortcut
+(`createDesktopShortcut`/`createStartMenuShortcut`). To add one for a build you
+are running in place — the unpacked output, an installed copy, or the portable
+`.exe` — use the script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File desktop\windows-shortcut.ps1 `
+  -TargetPath .\release\win-unpacked\WebPi.exe
+```
+
+It writes `WebPi.lnk` to the current user's Desktop (whatever the shell has
+redirected it to, which is not always `%USERPROFILE%\Desktop`), takes the icon
+from the executable, and sets the working directory so the app starts from its
+own folder. Point it at `release\win-unpacked\WebPi.exe` rather than the
+single-file portable: the portable unpacks its whole tree to a temporary folder
+on every launch, so it starts noticeably slower.
+
 `.github/workflows/desktop-release.yml` builds Windows x64, Linux x64/arm64, and
 macOS x64/arm64 on the matching runners, starts each packaged artifact to verify
 it boots, uploads the artifacts, and publishes a GitHub Release with every

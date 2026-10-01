@@ -160,6 +160,8 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
       "shortcutName": "WebPi",
       "artifactName": "WebPi-Setup-${version}-${arch}.${ext}"
     },
