@@ -77,6 +77,7 @@ them. These are the things to check, and the tests that already guard them:
 | The readiness contract `WebPi ready at <url>` / `WebPi is already running at <url>` | `bin/pi-web.js`, `extensions/webpi/index.ts`, `desktop/launcher.js` | `lib/webpi-extension.test.mjs` (asserts all three agree) |
 | Reserved-port list, kept equal to Next.js's own | `bin/port-selection.js` | `lib/port-selection.test.mjs` |
 | Branding: window title, manifest, empty-chat heading, sidebar label, Basic-auth realm, i18n strings | `app/`, `components/`, `lib/i18n/messages/*`, `proxy.ts` | reviewed by hand |
+| The four readmes describe WebPi, link to each other, and embed `docs/screenshot.png` | `README*.md` | `lib/readme-branding.test.mjs` |
 | Desktop shell and packaging | `desktop/`, `.github/workflows/desktop-release.yml` | `lib/desktop-*.test.mjs` |
 
 Everything else — sessions, models, tools, terminal, worktrees, plugins — is
@@ -90,6 +91,12 @@ additions, so they merge without conflict. The files that *are* edited in both
 places — `package.json`, `README.md`, `components/ChatWindow.tsx`,
 `components/SessionSidebar.tsx`, `app/layout.tsx`, `lib/i18n/messages/*`,
 `proxy.ts`, `eslint.config.mjs` — are where conflicts come from.
+
+The four readmes are the loudest case: they were rewritten as WebPi documents, so
+any upstream edit to them now conflicts instead of merging silently. Resolve by
+keeping this fork's text and folding in the factual changes from upstream's side
+(a new option, a new platform requirement). `lib/readme-branding.test.mjs` fails
+if a readme ends up describing upstream's project instead of this one.
 
 ## History
 
