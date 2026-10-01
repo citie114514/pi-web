@@ -77,7 +77,7 @@ The Windows artifact set was built and exercised on this machine
 (`electron-builder --win`): NSIS installer, single-file portable, and the
 portable zip. A packaged build starts its own service, loads the UI, and releases
 the port when the app quits; a portable build writes its settings into the
-extracted folder.
+extracted folder (verified by unzipping the archive and running it in place).
 
 Linux and macOS are built by `.github/workflows/desktop-release.yml` on real
 runners. The first CI run filed two bugs that a Windows-only check could not see:
@@ -85,8 +85,26 @@ electron-builder omits the architecture suffix when it matches the host, and
 per-target `arch` arrays in the config overrode the CLI flags, so both Linux jobs
 built both architectures and their identically named portable zips overwrote each
 other. Both are fixed (the arch now comes from the folder or the executable
-header, plus a duplicate-name guard, and the workflow passes the arch); the run
-that follows this commit is the verification.
+header, plus a duplicate-name guard, and the workflow passes the arch).
+
+The final CI run builds all four jobs and then **starts each packaged artifact**
+with the smoke mode, which is the strongest evidence available without a desktop:
+
+| Platform | Data directory | Result |
+| --- | --- | --- |
+| Windows x64 (unpacked `.exe`) | `C:\Users\runneradmin\AppData\Roaming\webpi` | `owned=true`, `title=WebPi` |
+| Linux x64 (AppImage) | `/home/runner/.config/webpi` | `owned=true`, `title=WebPi` |
+| Linux arm64 (AppImage) | `/home/runner/.config/webpi` | `owned=true`, `title=WebPi` |
+| macOS arm64 (`.app`) | `/Users/runner/Library/Application Support/webpi` | `owned=true`, `title=WebPi` |
+
+Artifacts produced per platform: `WebPi-Setup-<version>-x64.exe`,
+`WebPi-Portable-<version>-x64.exe`, `WebPi-<version>-linux-x86_64.AppImage`,
+`WebPi-<version>-linux-amd64.deb`, `WebPi-<version>-linux-arm64.AppImage`,
+`WebPi-<version>-linux-arm64.deb`, `WebPi-Setup-<version>-{x64,arm64}.dmg`,
+`WebPi-<version>-{mac-x64,mac-arm64}.zip`, and one `*-portable.zip` per
+platform/arch with `SHA256SUMS.txt`. Note that electron-builder spells the Linux
+x64 architecture `x86_64`/`amd64` in installer names while the portable archives
+use `x64`.
 
 ## Configuration and data touched at runtime
 

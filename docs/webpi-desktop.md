@@ -36,11 +36,14 @@ offering 重启服务 or 退出.
 | Platform | Installer | Portable |
 | --- | --- | --- |
 | Windows x64 | `WebPi-Setup-<version>-x64.exe` (NSIS, per-user install) | `WebPi-Portable-<version>-x64.exe` (single file) and `WebPi-<version>-win-x64-portable.zip` |
-| Linux x64 / arm64 | `WebPi-<version>-linux-<arch>.AppImage`, `.deb` | `WebPi-<version>-linux-<arch>-portable.zip` |
+| Linux x64 | `WebPi-<version>-linux-x86_64.AppImage`, `WebPi-<version>-linux-amd64.deb` | `WebPi-<version>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi-<version>-linux-arm64.AppImage`, `WebPi-<version>-linux-arm64.deb` | `WebPi-<version>-linux-arm64-portable.zip` |
 | macOS x64 / arm64 | `WebPi-Setup-<version>-<arch>.dmg` | `WebPi-<version>-mac-<arch>-portable.zip` |
 
 `SHA256SUMS.txt` accompanies the portable archives; the release workflow writes
-a combined one for every published file.
+a combined one for every published file. Electron-builder spells the Linux x64
+architecture `x86_64` for AppImage and `amd64` for deb, while the portable
+archives use `x64`; the same build is meant either way.
 
 ### Portable mode
 
@@ -136,3 +139,14 @@ WEBPI_DESKTOP_SMOKE=1 WEBPI_DESKTOP_SMOKE_SCREENSHOT=/tmp/webpi.png npx electron
 
 It logs the resolved data directory, whether this instance owns the service, the
 page title, and the first line of rendered text, then exits `0`.
+
+The release workflow runs exactly this check against the **packaged artifact** on
+every platform (the unpacked Windows build, the Linux AppImage under `xvfb-run`,
+and the macOS `.app`). A build that produces installers but cannot boot them
+fails CI, so these are verified to start their own service and render the UI:
+
+| Platform | Data directory | Result |
+| --- | --- | --- |
+| Windows x64 | `%APPDATA%\webpi` | `owned=true`, `title=WebPi` |
+| Linux x64 / arm64 (AppImage) | `~/.config/webpi` | `owned=true`, `title=WebPi` |
+| macOS arm64 (`.app`) | `~/Library/Application Support/webpi` | `owned=true`, `title=WebPi` |
