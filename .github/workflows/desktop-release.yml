@@ -97,6 +97,7 @@ jobs:
             release/*.dmg
             release/*.AppImage
             release/*.deb
+            release/*.zip
             release/portable/*.zip
             release/portable/SHA256SUMS.txt
           if-no-files-found: error
@@ -112,6 +113,15 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+      - name: Flatten the downloaded artifacts
+        run: |
+          cd artifacts
+          # upload-artifact stores each file below the common parent of its path
+          # patterns, so `release/portable/*.zip` arrives as `portable/*.zip`.
+          # Release assets are flat, so move everything up one level.
+          find . -mindepth 2 -type f -exec mv -f {} . \;
+          find . -mindepth 1 -type d -exec rm -rf {} +
+          ls -1
       - name: Combine checksums
         run: |
           cd artifacts
