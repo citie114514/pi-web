@@ -35,10 +35,10 @@ offering 重启服务 or 退出.
 
 | Platform | Installer | Portable |
 | --- | --- | --- |
-| Windows x64 | `WebPi-Setup-<version>-x64.exe` (NSIS, per-user install) | `WebPi-Portable-<version>-x64.exe` (single file) and `WebPi-<version>-win-x64-portable.zip` |
-| Linux x64 | `WebPi-<version>-linux-x86_64.AppImage`, `WebPi-<version>-linux-amd64.deb` | `WebPi-<version>-linux-x64-portable.zip` |
-| Linux arm64 | `WebPi-<version>-linux-arm64.AppImage`, `WebPi-<version>-linux-arm64.deb` | `WebPi-<version>-linux-arm64-portable.zip` |
-| macOS x64 / arm64 | `WebPi-Setup-<version>-<arch>.dmg` | `WebPi-<version>-mac-<arch>-portable.zip` |
+| Windows x64 | `WebPi-Desktop-Setup-<version>-x64.exe` (NSIS, per-user install) | `WebPi-Desktop-Portable-<version>-x64.exe` (single file) and `WebPi-Desktop-<version>-win-x64-portable.zip` |
+| Linux x64 | `WebPi-Desktop-<version>-linux-x86_64.AppImage`, `WebPi-Desktop-<version>-linux-amd64.deb` | `WebPi-Desktop-<version>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi-Desktop-<version>-linux-arm64.AppImage`, `WebPi-Desktop-<version>-linux-arm64.deb` | `WebPi-Desktop-<version>-linux-arm64-portable.zip` |
+| macOS x64 / arm64 | `WebPi-Desktop-Setup-<version>-<arch>.dmg` | `WebPi-Desktop-<version>-mac-<arch>-portable.zip` |
 
 `SHA256SUMS.txt` accompanies the portable archives; the release workflow writes
 a combined one for every published file. Electron-builder spells the Linux x64
@@ -111,8 +111,8 @@ The workflow runs on a `v*` tag, on pull requests that touch the desktop shell o
 the build config, and on demand. To cut a release:
 
 ```bash
-git tag -a v0.10.0-webpi.1 -m "WebPi Desktop 0.10.0"
-git push origin v0.10.0-webpi.1
+git tag -a v0.10.0-webpi.3 -m "WebPi Desktop 0.10.0"
+git push origin v0.10.0-webpi.3
 ```
 
 Upstream already owns `v<version>` tags (`v0.10.0` points at the upstream release

@@ -40,10 +40,10 @@ WebPi 是 [pi-web](https://github.com/agegr/pi-web) 的下游构建：应用本�
 
 | 平台 | 安装包 | 便携版 |
 | --- | --- | --- |
-| Windows x64 | `WebPi-Setup-<版本>-x64.exe`（按用户安装，不需要管理员权限） | `WebPi-Portable-<版本>-x64.exe`、`WebPi-<版本>-win-x64-portable.zip` |
-| Linux x64 | `WebPi-<版本>-linux-x86_64.AppImage`、`WebPi-<版本>-linux-amd64.deb` | `WebPi-<版本>-linux-x64-portable.zip` |
-| Linux arm64 | `WebPi-<版本>-linux-arm64.AppImage`、`WebPi-<版本>-linux-arm64.deb` | `WebPi-<版本>-linux-arm64-portable.zip` |
-| macOS x64 / arm64 | `WebPi-Setup-<版本>-<arch>.dmg` | `WebPi-<版本>-mac-<arch>-portable.zip` |
+| Windows x64 | `WebPi-Desktop-Setup-<版本>-x64.exe`（按用户安装，不需要管理员权限） | `WebPi-Desktop-Portable-<版本>-x64.exe`、`WebPi-Desktop-<版本>-win-x64-portable.zip` |
+| Linux x64 | `WebPi-Desktop-<版本>-linux-x86_64.AppImage`、`WebPi-Desktop-<版本>-linux-amd64.deb` | `WebPi-Desktop-<版本>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi-Desktop-<版本>-linux-arm64.AppImage`、`WebPi-Desktop-<版本>-linux-arm64.deb` | `WebPi-Desktop-<版本>-linux-arm64-portable.zip` |
+| macOS x64 / arm64 | `WebPi-Desktop-Setup-<版本>-<arch>.dmg` | `WebPi-Desktop-<版本>-mac-<arch>-portable.zip` |
 
 应用与服务的关系、便携模式与签名提示见 [桌面应用](#桌面应用)。
 

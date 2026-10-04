@@ -112,16 +112,28 @@ with the smoke mode, which is the strongest evidence available without a desktop
 
 | Platform | Data directory | Result |
 | --- | --- | --- |
-| Windows x64 (unpacked `.exe`) | `C:\Users\runneradmin\AppData\Roaming\webpi` | `owned=true`, `title=WebPi` |
-| Linux x64 (AppImage) | `/home/runner/.config/webpi` | `owned=true`, `title=WebPi` |
-| Linux arm64 (AppImage) | `/home/runner/.config/webpi` | `owned=true`, `title=WebPi` |
-| macOS arm64 (`.app`) | `/Users/runner/Library/Application Support/webpi` | `owned=true`, `title=WebPi` |
+| Windows x64 (unpacked `.exe`) | `C:\Users\runneradmin\AppData\Roaming\webpi` | `owned=true`, page `WebPi`, window `WebPi Desktop` |
+| Linux x64 (AppImage) | `/home/runner/.config/webpi` | `owned=true`, page `WebPi`, window `WebPi Desktop` |
+| Linux arm64 (AppImage) | `/home/runner/.config/webpi` | `owned=true`, page `WebPi`, window `WebPi Desktop` |
+| macOS arm64 (`.app`) | `/Users/runner/Library/Application Support/webpi` | `owned=true`, page `WebPi`, window `WebPi Desktop` |
 
-Artifacts produced per platform: `WebPi-Setup-<version>-x64.exe`,
-`WebPi-Portable-<version>-x64.exe`, `WebPi-<version>-linux-x86_64.AppImage`,
-`WebPi-<version>-linux-amd64.deb`, `WebPi-<version>-linux-arm64.AppImage`,
-`WebPi-<version>-linux-arm64.deb`, `WebPi-Setup-<version>-{x64,arm64}.dmg`,
-`WebPi-<version>-{mac-x64,mac-arm64}.zip`, and one `*-portable.zip` per
+The third bug CI filed came from a rename, not from the merge: changing
+`build.productName` to `WebPi Desktop` renamed the macOS bundle to
+`WebPi Desktop.app`, its inner executable to `WebPi Desktop`, and the Windows
+executable to `WebPi Desktop.exe` — while the workflow still spelled out
+`WebPi.app` / `WebPi.exe`, so the Windows and macOS smoke steps failed on paths
+that no longer existed (Linux survived only because it already used a wildcard).
+All four platforms now locate their artifact with a wildcard, the step runs under
+`bash` everywhere so the same globbing works on Windows, and
+`lib/desktop-packaging.test.mjs` fails if a product name reappears in a smoke
+command. The data directory itself did **not** move: Electron reads the package
+`name` (`webpi`), so existing settings keep working across the rename.
+
+Artifacts produced per platform: `WebPi-Desktop-Setup-<version>-x64.exe`,
+`WebPi-Desktop-Portable-<version>-x64.exe`, `WebPi-Desktop-<version>-linux-x86_64.AppImage`,
+`WebPi-Desktop-<version>-linux-amd64.deb`, `WebPi-Desktop-<version>-linux-arm64.AppImage`,
+`WebPi-Desktop-<version>-linux-arm64.deb`, `WebPi-Desktop-Setup-<version>-{x64,arm64}.dmg`,
+`WebPi-Desktop-<version>-{mac-x64,mac-arm64}.zip`, and one `*-portable.zip` per
 platform/arch with `SHA256SUMS.txt`. Note that electron-builder spells the Linux
 x64 architecture `x86_64`/`amd64` in installer names while the portable archives
 use `x64`.

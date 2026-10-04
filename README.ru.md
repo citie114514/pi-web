@@ -40,10 +40,10 @@ WebPi — сборка на основе [pi-web](https://github.com/agegr/pi-we
 
 | Платформа | Установщик | Портативная версия |
 | --- | --- | --- |
-| Windows x64 | `WebPi-Setup-<version>-x64.exe` (для текущего пользователя, без прав администратора) | `WebPi-Portable-<version>-x64.exe`, `WebPi-<version>-win-x64-portable.zip` |
-| Linux x64 | `WebPi-<version>-linux-x86_64.AppImage`, `WebPi-<version>-linux-amd64.deb` | `WebPi-<version>-linux-x64-portable.zip` |
-| Linux arm64 | `WebPi-<version>-linux-arm64.AppImage`, `WebPi-<version>-linux-arm64.deb` | `WebPi-<version>-linux-arm64-portable.zip` |
-| macOS x64 / arm64 | `WebPi-Setup-<version>-<arch>.dmg` | `WebPi-<version>-mac-<arch>-portable.zip` |
+| Windows x64 | `WebPi-Desktop-Setup-<version>-x64.exe` (для текущего пользователя, без прав администратора) | `WebPi-Desktop-Portable-<version>-x64.exe`, `WebPi-Desktop-<version>-win-x64-portable.zip` |
+| Linux x64 | `WebPi-Desktop-<version>-linux-x86_64.AppImage`, `WebPi-Desktop-<version>-linux-amd64.deb` | `WebPi-Desktop-<version>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi-Desktop-<version>-linux-arm64.AppImage`, `WebPi-Desktop-<version>-linux-arm64.deb` | `WebPi-Desktop-<version>-linux-arm64-portable.zip` |
+| macOS x64 / arm64 | `WebPi-Desktop-Setup-<version>-<arch>.dmg` | `WebPi-Desktop-<version>-mac-<arch>-portable.zip` |
 
 О том, как приложение управляет сервером, о портативном режиме и предупреждениях подписи читайте в разделе [Настольное приложение](#настольное-приложение).
 
