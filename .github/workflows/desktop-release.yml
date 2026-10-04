@@ -45,25 +45,40 @@ jobs:
             args: --win
             arch: x64
             unpacked: win-unpacked
-            smoke: release/win-unpacked/WebPi.exe
+            # 按通配查找产物：产品改名（productName）后不需要改这里
+            smoke: |
+              exe=$(ls ./release/win-unpacked/*.exe | head -1)
+              echo "smoke: $exe"
+              "$exe"
           - name: Linux x64
             runner: ubuntu-22.04
             args: --linux --x64
             arch: x64
             unpacked: linux-unpacked
-            smoke: xvfb-run -a ./release/WebPi-*-linux-x86_64.AppImage --appimage-extract-and-run --no-sandbox
+            smoke: |
+              app=$(ls ./release/*-linux-x86_64.AppImage | head -1)
+              echo "smoke: $app"
+              xvfb-run -a "$app" --appimage-extract-and-run --no-sandbox
           - name: Linux arm64
             runner: ubuntu-22.04-arm
             args: --linux --arm64
             arch: arm64
             unpacked: linux-arm64-unpacked
-            smoke: xvfb-run -a ./release/WebPi-*-linux-arm64.AppImage --appimage-extract-and-run --no-sandbox
+            smoke: |
+              app=$(ls ./release/*-linux-arm64.AppImage | head -1)
+              echo "smoke: $app"
+              xvfb-run -a "$app" --appimage-extract-and-run --no-sandbox
           - name: macOS x64 and arm64
             runner: macos-14
             args: --mac --x64 --arm64
             arch: ""
             unpacked: mac
-            smoke: ./release/mac-arm64/WebPi.app/Contents/MacOS/WebPi
+            # .app 名与其中的可执行文件名都随 productName 变，所以两处都从目录推
+            smoke: |
+              bundle=$(ls -d ./release/mac-arm64/*.app | head -1)
+              exe="$bundle/Contents/MacOS/$(basename "$bundle" .app)"
+              echo "smoke: $exe"
+              "$exe"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -86,6 +101,8 @@ jobs:
       - name: Smoke-test the packaged application
         # Proves the artifact actually boots and serves its own service on this
         # platform, not just that electron-builder produced files.
+        # bash on every runner so the wildcard lookup works the same everywhere.
+        shell: bash
         env:
           WEBPI_DESKTOP_SMOKE: "1"
         run: ${{ matrix.smoke }}
