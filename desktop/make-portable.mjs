@@ -28,7 +28,10 @@ const { PORTABLE_MARKER, executableDir, platformLabel } = require("./portable.js
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const releaseDir = join(root, "release");
-const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const version = pkg.version;
+// 便携包名跟随 electron-builder 的产品名（改名时只改一处）
+const PRODUCT = pkg.build?.productName ?? "PiGUI";
 const outDir = join(releaseDir, "portable");
 
 /** Where electron-builder puts `--dir` output, per platform and arch. */
@@ -130,7 +133,7 @@ if (new Set(labels).size !== labels.length) {
 }
 
 for (const { appDir, label } of targets) {
-  const staging = join(outDir, `WebPi-${version}-${label}-portable`);
+  const staging = join(outDir, `${PRODUCT}-${version}-${label}-portable`);
   const archive = `${staging}.zip`;
 
   console.log(`[portable] 装配 ${label}: ${appDir} -> ${staging}`);
