@@ -20,7 +20,7 @@ const { createSettingsStore, isPersistableWindowState, normalizeBounds } = requi
 const { ServerSupervisor } = require("./server-supervisor");
 const { buildTrayMenuTemplate } = require("./tray-menu");
 
-const PRODUCT = "PiGUI";
+const PRODUCT = "WebPi Desktop";
 const ASSETS_DIR = path.join(__dirname, "assets");
 const SMOKE = process.env.WEBPI_DESKTOP_SMOKE === "1";
 const SMOKE_SCREENSHOT = process.env.WEBPI_DESKTOP_SMOKE_SCREENSHOT || "";

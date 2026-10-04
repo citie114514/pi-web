@@ -130,7 +130,7 @@
   },
   "build": {
     "appId": "dev.webpi.desktop",
-    "productName": "PiGUI",
+    "productName": "WebPi Desktop",
     "copyright": "MIT - WebPi (downstream build of pi-web by agegr)",
     "directories": {
       "output": "release",
@@ -152,7 +152,7 @@
     "extraMetadata": {
       "main": "desktop/main.js"
     },
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "artifactName": "WebPi-Desktop-${version}-${os}-${arch}.${ext}",
     "win": {
       "icon": "desktop/assets/icon.png",
       "target": [
@@ -170,11 +170,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "PiGUI",
-      "artifactName": "PiGUI-Setup-${version}-${arch}.${ext}"
+      "shortcutName": "WebPi Desktop",
+      "artifactName": "WebPi-Desktop-Setup-${version}-${arch}.${ext}"
     },
     "portable": {
-      "artifactName": "PiGUI-Portable-${version}-${arch}.${ext}"
+      "artifactName": "WebPi-Desktop-Portable-${version}-${arch}.${ext}"
     },
     "linux": {
       "icon": "desktop/assets/icon.png",
@@ -192,7 +192,7 @@
       ],
       "desktop": {
         "entry": {
-          "Name": "PiGUI",
+          "Name": "WebPi Desktop",
           "Comment": "Local browser UI for the pi coding agent",
           "Categories": "Development;Utility;",
           "Terminal": "false"
@@ -228,7 +228,7 @@
       "darkModeSupport": true
     },
     "dmg": {
-      "artifactName": "PiGUI-Setup-${version}-${arch}.${ext}"
+      "artifactName": "WebPi-Desktop-Setup-${version}-${arch}.${ext}"
     }
   },
   "author": {

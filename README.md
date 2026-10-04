@@ -1,16 +1,16 @@
-# PiGUI
+# WebPi Desktop
 
 [中文文档](./README.zh-CN.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-**PiGUI is the desktop client for the [pi coding agent](https://github.com/earendil-works/pi), built on WebPi.** It is a normal desktop window with a tray icon: starting the app starts the service, quitting it stops the service, and it needs **no Node.js installation**. It reads the same configuration, credential, and session files as pi — a conversation started in the terminal opens in the app, and one started in the app is still there in the terminal.
+**WebPi Desktop is the desktop client for the [pi coding agent](https://github.com/earendil-works/pi), built on WebPi.** It is a normal desktop window with a tray icon: starting the app starts the service, quitting it stops the service, and it needs **no Node.js installation**. It reads the same configuration, credential, and session files as pi — a conversation started in the terminal opens in the app, and one started in the app is still there in the terminal.
 
-![PiGUI start screen: session sidebar, Get Started panel, and the Models, Skills and Settings entries](./docs/screenshot.png)
+![WebPi Desktop start screen: session sidebar, Get Started panel, and the Models, Skills and Settings entries](./docs/screenshot.png)
 
 Two things live in this repository, sharing one pi data directory (sessions and credentials stay in `~/.pi/agent`):
 
 | | What it is | How to run it |
 | --- | --- | --- |
-| **PiGUI** | The desktop client — its own window and tray icon, with the service started and stopped by the app | Download an installer or a portable build from the [releases page](https://github.com/citie114514/pi-web/releases/latest), or `npm run desktop` |
+| **WebPi Desktop** | The desktop client — its own window and tray icon, with the service started and stopped by the app | Download an installer or a portable build from the [releases page](https://github.com/citie114514/pi-web/releases/latest), or `npm run desktop` |
 | **WebPi** | The browser UI it is built on: sessions, chat, models, files, terminal — everything pi does | The global `webpi` command, or `/webpi` from inside pi |
 
 ## What this is not
@@ -19,9 +19,9 @@ GitHub has plenty of pi front ends and the names collide, so here are the bounda
 
 - **Not a terminal bridge.** WebPi is a real web UI (Next.js) that reads and writes pi's session files and RPC — not the TUI moved into a browser with xterm.js.
 - **Not another agent runtime.** Session management, model and auth setup, and agent execution all go through upstream `pi`; this is a shell around it.
-- **Built on `agegr/pi-web`**, which is where the web UI comes from. PiGUI adds the desktop shell, the packaging, and Windows-friendly startup.
+- **Built on `agegr/pi-web`**, which is where the web UI comes from. WebPi Desktop adds the desktop shell, the packaging, and Windows-friendly startup.
 
-WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application itself is upstream's work; this repository adds the `webpi` command, the PiGUI desktop client, the Pi package, Windows-friendly startup, and the WebPi name. Read [docs/webpi.md](./docs/webpi.md) for exactly what differs, [docs/webpi-desktop.md](./docs/webpi-desktop.md) for the desktop build, [docs/upstream-sync.md](./docs/upstream-sync.md) for how upstream changes are merged in, and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline this fork started from.
+WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the application itself is upstream's work; this repository adds the `webpi` command, the WebPi Desktop desktop client, the Pi package, Windows-friendly startup, and the WebPi name. Read [docs/webpi.md](./docs/webpi.md) for exactly what differs, [docs/webpi-desktop.md](./docs/webpi-desktop.md) for the desktop build, [docs/upstream-sync.md](./docs/upstream-sync.md) for how upstream changes are merged in, and [docs/upstream-inventory.md](./docs/upstream-inventory.md) for the baseline this fork started from.
 
 ## Features
 
@@ -40,10 +40,10 @@ Download the build for your platform from the [releases page](https://github.com
 
 | Platform | Installer | Portable |
 | --- | --- | --- |
-| Windows x64 | `PiGUI-Setup-<version>-x64.exe` (per-user, no administrator rights) | `PiGUI-Portable-<version>-x64.exe`, `PiGUI-<version>-win-x64-portable.zip` |
-| Linux x64 | `PiGUI-<version>-linux-x86_64.AppImage`, `PiGUI-<version>-linux-amd64.deb` | `PiGUI-<version>-linux-x64-portable.zip` |
-| Linux arm64 | `PiGUI-<version>-linux-arm64.AppImage`, `PiGUI-<version>-linux-arm64.deb` | `PiGUI-<version>-linux-arm64-portable.zip` |
-| macOS x64 / arm64 | `PiGUI-Setup-<version>-<arch>.dmg` | `PiGUI-<version>-mac-<arch>-portable.zip` |
+| Windows x64 | `WebPi Desktop-Setup-<version>-x64.exe` (per-user, no administrator rights) | `WebPi Desktop-Portable-<version>-x64.exe`, `WebPi Desktop-<version>-win-x64-portable.zip` |
+| Linux x64 | `WebPi Desktop-<version>-linux-x86_64.AppImage`, `WebPi Desktop-<version>-linux-amd64.deb` | `WebPi Desktop-<version>-linux-x64-portable.zip` |
+| Linux arm64 | `WebPi Desktop-<version>-linux-arm64.AppImage`, `WebPi Desktop-<version>-linux-arm64.deb` | `WebPi Desktop-<version>-linux-arm64-portable.zip` |
+| macOS x64 / arm64 | `WebPi Desktop-Setup-<version>-<arch>.dmg` | `WebPi Desktop-<version>-mac-<arch>-portable.zip` |
 
 See [Desktop application](#desktop-application) for what the app does with the server, portable mode, and the signing warnings.
 

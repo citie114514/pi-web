@@ -31,7 +31,7 @@ const releaseDir = join(root, "release");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const version = pkg.version;
 // 便携包名跟随 electron-builder 的产品名（改名时只改一处）
-const PRODUCT = pkg.build?.productName ?? "PiGUI";
+const PRODUCT = (pkg.build?.productName ?? "WebPi Desktop").replace(/\s+/g, "-");
 const outDir = join(releaseDir, "portable");
 
 /** Where electron-builder puts `--dir` output, per platform and arch. */

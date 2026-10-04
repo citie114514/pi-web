@@ -1,16 +1,16 @@
-# PiGUI
+# WebPi Desktop
 
 [English](./README.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-**PiGUI 是 [pi coding agent](https://github.com/earendil-works/pi) 的桌面客户端，基于 WebPi 构建。** 它就是一个带托盘图标的普通桌面窗口：启动应用即启动服务、退出应用即停止服务，而且**不需要装 Node.js**。它读取与 pi 相同的配置、凭据与会话文件——终端里开始的对话能在桌面端打开，桌面端聊的也能回到终端继续。
+**WebPi Desktop 是 [pi coding agent](https://github.com/earendil-works/pi) 的桌面客户端，基于 WebPi 构建。** 它就是一个带托盘图标的普通桌面窗口：启动应用即启动服务、退出应用即停止服务，而且**不需要装 Node.js**。它读取与 pi 相同的配置、凭据与会话文件——终端里开始的对话能在桌面端打开，桌面端聊的也能回到终端继续。
 
-![PiGUI 起始界面：会话侧边栏、Get Started 面板，以及底部的模型、技能与设置入口](./docs/screenshot.png)
+![WebPi Desktop 起始界面：会话侧边栏、Get Started 面板，以及底部的模型、技能与设置入口](./docs/screenshot.png)
 
 本仓库里有**两个东西**，共用同一份 pi 数据（会话与凭据都在 `~/.pi/agent`）：
 
 | | 是什么 | 怎么跑 |
 | --- | --- | --- |
-| **PiGUI** | 桌面客户端——独立窗口与托盘图标，服务随应用启停 | 从[发布页](https://github.com/citie114514/pi-web/releases/latest)下载安装包或便携版，或 `npm run desktop` |
+| **WebPi Desktop** | 桌面客户端——独立窗口与托盘图标，服务随应用启停 | 从[发布页](https://github.com/citie114514/pi-web/releases/latest)下载安装包或便携版，或 `npm run desktop` |
 | **WebPi** | 它基于的浏览器界面：会话、对话、模型、文件、终端，pi 能做的都在里面 | 全局命令 `webpi`，或在 pi 里执行 `/webpi` |
 
 ## 这不是什么
@@ -19,9 +19,9 @@ GitHub 上 pi 的前端已经很多，名字也容易撞。先说清楚本项目
 
 - **不是终端桥接**。WebPi 是真正的 Web 界面（Next.js），直接读写 pi 的会话文件与 RPC，不是把 TUI 用 xterm.js 搬到浏览器。
 - **不是另一套 agent 运行时**。会话管理、模型与登录配置、agent 执行全部走上游 `pi`；界面只是它外面的一层壳。
-- **基于 `agegr/pi-web`**，Web 界面来自那里。PiGUI 在此之上加了桌面外壳、打包，以及对 Windows 更友好的启动流程。
+- **基于 `agegr/pi-web`**，Web 界面来自那里。WebPi Desktop 在此之上加了桌面外壳、打包，以及对 Windows 更友好的启动流程。
 
-WebPi 是 [pi-web](https://github.com/agegr/pi-web) 的下游构建：应用本体是上游的工作，本仓库增加了 `webpi` 命令、PiGUI 桌面客户端、Pi 包、对 Windows 更友好的启动流程，以及 WebPi 品牌。差异细节见 [docs/webpi.md](./docs/webpi.md)，桌面端见 [docs/webpi-desktop.md](./docs/webpi-desktop.md)，上游合并机制见 [docs/upstream-sync.md](./docs/upstream-sync.md)，fork 起点见 [docs/upstream-inventory.md](./docs/upstream-inventory.md)。
+WebPi 是 [pi-web](https://github.com/agegr/pi-web) 的下游构建：应用本体是上游的工作，本仓库增加了 `webpi` 命令、WebPi Desktop 桌面客户端、Pi 包、对 Windows 更友好的启动流程，以及 WebPi 品牌。差异细节见 [docs/webpi.md](./docs/webpi.md)，桌面端见 [docs/webpi-desktop.md](./docs/webpi-desktop.md)，上游合并机制见 [docs/upstream-sync.md](./docs/upstream-sync.md)，fork 起点见 [docs/upstream-inventory.md](./docs/upstream-inventory.md)。
 
 ## 功能
 

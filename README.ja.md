@@ -1,16 +1,16 @@
-# PiGUI
+# WebPi Desktop
 
 [English](./README.md) | [中文文档](./README.zh-CN.md) | [Русский](./README.ru.md)
 
-**PiGUI は [pi coding agent](https://github.com/earendil-works/pi) のデスクトップクライアントで、WebPi を土台にしています。** トレイアイコン付きの普通のデスクトップウィンドウで、アプリを起動するとサーバーが起動し、終了すると停止します。**Node.js のインストールは不要**です。pi と同じ設定・認証情報・セッションファイルを読み書きするため、ターミナルで始めた会話をアプリで開けますし、その逆もできます。
+**WebPi Desktop は [pi coding agent](https://github.com/earendil-works/pi) のデスクトップクライアントで、WebPi を土台にしています。** トレイアイコン付きの普通のデスクトップウィンドウで、アプリを起動するとサーバーが起動し、終了すると停止します。**Node.js のインストールは不要**です。pi と同じ設定・認証情報・セッションファイルを読み書きするため、ターミナルで始めた会話をアプリで開けますし、その逆もできます。
 
-![PiGUI の開始画面：セッションサイドバー、Get Started パネル、下部のモデル・スキル・設定](./docs/screenshot.png)
+![WebPi Desktop の開始画面：セッションサイドバー、Get Started パネル、下部のモデル・スキル・設定](./docs/screenshot.png)
 
 このリポジトリーには**二つ**あり、pi のデータ（セッションと認証情報は `~/.pi/agent`）を共有します。
 
 | | 何か | 起動方法 |
 | --- | --- | --- |
-| **PiGUI** | デスクトップクライアント — 専用ウィンドウとトレイアイコン、サーバーはアプリと一緒に起動・停止 | [リリースページ](https://github.com/citie114514/pi-web/releases/latest)からインストーラーまたはポータブル版、または `npm run desktop` |
+| **WebPi Desktop** | デスクトップクライアント — 専用ウィンドウとトレイアイコン、サーバーはアプリと一緒に起動・停止 | [リリースページ](https://github.com/citie114514/pi-web/releases/latest)からインストーラーまたはポータブル版、または `npm run desktop` |
 | **WebPi** | その土台となるブラウザー UI：セッション、チャット、モデル、ファイル、ターミナル | グローバルコマンド `webpi`、または pi 内で `/webpi` |
 
 ## これは何ではないか
@@ -19,9 +19,9 @@ GitHub には pi のフロントエンドが数多くあり、名前も衝突し
 
 - **ターミナルのブリッジではありません。** WebPi は本物の Web UI（Next.js）で、pi のセッションファイルと RPC を直接読み書きします。TUI を xterm.js でブラウザーに移したものではありません。
 - **別の agent ランタイムではありません。** セッション管理、モデルと認証の設定、agent の実行はすべて上流の `pi` を通します。これはその外側の殻です。
-- **`agegr/pi-web` が土台**で、Web UI はそこから来ています。PiGUI が加えるのはデスクトップシェル、パッケージング、Windows で扱いやすい起動処理です。
+- **`agegr/pi-web` が土台**で、Web UI はそこから来ています。WebPi Desktop が加えるのはデスクトップシェル、パッケージング、Windows で扱いやすい起動処理です。
 
-WebPi は [pi-web](https://github.com/agegr/pi-web) の下流ビルドです。アプリケーション本体は上流の成果物で、このリポジトリーが追加するのは `webpi` コマンド、PiGUI デスクトップクライアント、Pi パッケージ、Windows で扱いやすい起動処理、そして WebPi という名称です。差分は [docs/webpi.md](./docs/webpi.md)、デスクトップ版は [docs/webpi-desktop.md](./docs/webpi-desktop.md)、上流の取り込みは [docs/upstream-sync.md](./docs/upstream-sync.md)、分岐元は [docs/upstream-inventory.md](./docs/upstream-inventory.md) を参照してください。
+WebPi は [pi-web](https://github.com/agegr/pi-web) の下流ビルドです。アプリケーション本体は上流の成果物で、このリポジトリーが追加するのは `webpi` コマンド、WebPi Desktop デスクトップクライアント、Pi パッケージ、Windows で扱いやすい起動処理、そして WebPi という名称です。差分は [docs/webpi.md](./docs/webpi.md)、デスクトップ版は [docs/webpi-desktop.md](./docs/webpi-desktop.md)、上流の取り込みは [docs/upstream-sync.md](./docs/upstream-sync.md)、分岐元は [docs/upstream-inventory.md](./docs/upstream-inventory.md) を参照してください。
 
 ## 機能
 
