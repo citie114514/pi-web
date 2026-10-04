@@ -56,7 +56,7 @@ const CLOSE_DIALOG = {
   checkboxLabel: CLOSE_DIALOG_CHECKBOX_LABEL,
   checkboxChecked: false,
   noLink: true,
-  title: "关闭 WebPi",
+  title: "关闭 PiGUI",
   message: "关闭窗口时要怎么做？",
   detail: "最小化到托盘会保留 WebPi 服务继续运行；直接关闭会同时停止 WebPi 服务。",
 };

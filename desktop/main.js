@@ -20,7 +20,7 @@ const { createSettingsStore, isPersistableWindowState, normalizeBounds } = requi
 const { ServerSupervisor } = require("./server-supervisor");
 const { buildTrayMenuTemplate } = require("./tray-menu");
 
-const PRODUCT = "WebPi";
+const PRODUCT = "PiGUI";
 const ASSETS_DIR = path.join(__dirname, "assets");
 const SMOKE = process.env.WEBPI_DESKTOP_SMOKE === "1";
 const SMOKE_SCREENSHOT = process.env.WEBPI_DESKTOP_SMOKE_SCREENSHOT || "";
@@ -104,7 +104,7 @@ async function loadUI(url) {
     const body = await mainWindow.webContents
       .executeJavaScript("document.body.innerText.slice(0, 60).replace(/\\s+/g, ' ')")
       .catch(() => "");
-    logLine(`[smoke] url=${url} owned=${supervisor.owned} title=${title} body=${body}`);
+    logLine(`[smoke] url=${url} owned=${supervisor.owned} title=${title} window=${mainWindow.getTitle()} body=${body}`);
     if (SMOKE_SCREENSHOT) {
       const image = await mainWindow.webContents.capturePage();
       fs.writeFileSync(SMOKE_SCREENSHOT, image.toPNG());
@@ -138,6 +138,14 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  // The page sets its own title (the WebPi web UI, plus the active session), so
+  // the window would otherwise read "WebPi". Keep the session context but name
+  // the application the user actually launched.
+  mainWindow.on("page-title-updated", (event) => {
+    event.preventDefault();
+    const pageTitle = mainWindow?.webContents.getTitle() ?? "";
+    mainWindow?.setTitle(pageTitle ? pageTitle.replace(/WebPi/g, PRODUCT) : PRODUCT);
+  });
   mainWindow.on("close", (event) => {
     void handleWindowClose(event);
   });
