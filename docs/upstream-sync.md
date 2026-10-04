@@ -103,3 +103,4 @@ if a readme ends up describing upstream's project instead of this one.
 | Date | Upstream | Result |
 | --- | --- | --- |
 | 2026-09-30 | 36 commits, pi 0.87.1 → 0.99.1 (streaming reasoning level, settings group switches, Git-driven file hiding, Safari fixes) | Zero conflicts; `npm test` 1569 tests / 1553 passing / the same 9 pre-existing Windows failures; desktop smoke check `owned=true title=WebPi` |
+| 2026-10-01 | 73 commits, pi 0.99.1 → 1.0.0 (upstream v0.10.0; MCP servers, Code mode, stacked dialogs) | Two conflicts — `package.json` (identity vs version) and `package-lock.json` — resolved by keeping the fork's fields and taking upstream's version, then reconciling the lockfile with `npm install`. Build, lint, `tsc`, CLI, desktop smoke and all eight fork-owned test files pass. The failure count jumps to ~115, but a pristine `upstream/main` worktree fails 116 on the same machine with an empty set difference — see `docs/upstream-inventory.md`. |

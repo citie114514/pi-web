@@ -52,9 +52,28 @@ plus Playwright E2E on Node 22.19.0. `.github/workflows/demo-pages.yml` builds
 `npm test` reported **1307 tests, 1295 passing, 9 failing** before any change
 in this fork. After the WebPi packaging layer and the desktop shell added tests
 (port selection, package contract, close policy, tray menu, service supervisor,
-desktop settings, portable resolution, packaging config), and after merging 36
-upstream commits (pi 0.87.1 → 0.99.1), it reports **1569 tests, 1553 passing, 9
-failing, 7 skipped** — the same pre-existing failures, no new ones:
+desktop settings, portable resolution, packaging config), after merging 36
+upstream commits (pi 0.87.1 → 0.99.1), and after merging 73 more (pi 0.99.1 →
+1.0.0, upstream v0.10.0), the suite no longer finishes on this machine and
+reports roughly **115 failures** — but they are **not this fork's**:
+
+| | tests | passing | failing |
+| --- | --- | --- | --- |
+| this fork after the 0.10.0 merge | 1412 (stopped before the end) | 1297 | 114 |
+| a pristine `upstream/main` worktree, same machine | 1412 (same stop point) | 1296 | 116 |
+
+The set difference is empty: **no failure appears in this fork that upstream
+does not also have here.** Almost all of them are upstream's new MCP tests
+(`components/McpConfig.test.mjs` and friends) dying on
+`useI18n must be used inside I18nProvider` — a jiti module-instance problem on
+Windows, not a logic error. Upstream CI runs on Ubuntu and never sees it. The
+suite also stops partway through on both trees (a test that hangs here), which is
+why there is no summary line.
+
+When a merge makes the failure count jump, **do not start fixing them**: run the
+same suite in a worktree of `upstream/main` on the same machine and compare the
+failure *sets*. Only failures unique to this fork are regressions. The nine
+Windows failures listed below were the pre-0.10.0 baseline:
 
 - `only the active file tab mounts a FileViewer`
 - `the active viewer restores tab state and saves it with a revision`

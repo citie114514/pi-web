@@ -111,11 +111,11 @@ The workflow runs on a `v*` tag, on pull requests that touch the desktop shell o
 the build config, and on demand. To cut a release:
 
 ```bash
-git tag -a v0.9.3-webpi.1 -m "WebPi Desktop 0.9.3"
-git push origin v0.9.3-webpi.1
+git tag -a v0.10.0-webpi.1 -m "WebPi Desktop 0.10.0"
+git push origin v0.10.0-webpi.1
 ```
 
-Upstream already owns `v<version>` tags (`v0.9.3` points at the upstream release
+Upstream already owns `v<version>` tags (`v0.10.0` points at the upstream release
 commit, which has no desktop shell), so this fork publishes under
 `v<version>-webpi.<n>` instead of overwriting them. The release name is
 `WebPi Desktop <tag>`.
