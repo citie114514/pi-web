@@ -137,8 +137,9 @@ jobs:
           CONFLICTS: ${{ steps.merge.outputs.conflicts }}
         run: |
           set -euo pipefail
+          # Issues 可能被禁用（fork 上常见），标签创建失败不应中断本步骤。
           gh label create upstream-sync --color FBCA04 \
-            --description "Upstream merge needs manual conflict resolution" --force
+            --description "Upstream merge needs manual conflict resolution" --force || true
 
           count=${{ steps.behind.outputs.count }}
           upstream_head=$(git rev-parse --short upstream/main)
@@ -168,13 +169,22 @@ jobs:
             echo "_此 issue 由 \`.github/workflows/upstream-sync.yml\` 自动维护，下次冲突时会更新内容。_"
           } > /tmp/issue-body.md
 
-          existing=$(gh issue list --label upstream-sync --state open --json number --jq '.[0].number')
+          existing=$(gh issue list --label upstream-sync --state open --json number --jq '.[0].number' 2>/dev/null || true)
           if [ -n "$existing" ]; then
-            gh issue edit "$existing" --body-file /tmp/issue-body.md
-            gh issue comment "$existing" --body "上游又有新提交（${count} 个，至 \`${upstream_head}\`），冲突清单已更新。"
+            gh issue edit "$existing" --body-file /tmp/issue-body.md || echo "::warning::无法更新 issue #$existing"
+            gh issue comment "$existing" --body "上游又有新提交（${count} 个，至 \`${upstream_head}\`），冲突清单已更新。" || true
           else
             gh issue create \
               --title "chore(上游): 合并上游 main 需要手工解决冲突" \
               --label upstream-sync \
-              --body-file /tmp/issue-body.md
+              --body-file /tmp/issue-body.md \
+              || echo "::warning::无法创建 issue（仓库可能禁用了 Issues）；冲突清单见本步骤日志与 merge 步骤输出"
           fi
+
+          # 无论 Issues 是否可用，都把冲突清单写进 workflow summary，
+          # 这样在 Actions 页面里也能直接看到要手工解决哪些文件。
+          {
+            echo "## 上游合并冲突（${count} 个提交，至 ${upstream_head}）"
+            echo
+            cat /tmp/issue-body.md
+          } >> "$GITHUB_STEP_SUMMARY"
