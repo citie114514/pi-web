@@ -109,10 +109,12 @@ async function loadUI(url) {
       .executeJavaScript("document.body.innerText.slice(0, 60).replace(/\\s+/g, ' ')")
       .catch(() => "");
     // Canary for the external-link wiring: a popup must be denied by
-    // setWindowOpenHandler. An unsafe scheme is used on purpose so a regression
-    // shows up as popupDenied=false instead of launching a browser during CI.
+    // setWindowOpenHandler. The default probe uses an unsafe scheme so a
+    // regression shows up as popupDenied=false instead of launching a browser
+    // during CI; WEBPI_SMOKE_POPUP_URL lets a local run exercise the real path.
+    const popupUrl = process.env.WEBPI_SMOKE_POPUP_URL || "file:///webpi-smoke-probe";
     const popupDenied = await mainWindow.webContents
-      .executeJavaScript("window.open('file:///webpi-smoke-probe') === null")
+      .executeJavaScript(`window.open(${JSON.stringify(popupUrl)}) === null`)
       .catch(() => false);
     logLine(
       `[smoke] url=${url} owned=${supervisor.owned} title=${title} window=${mainWindow.getTitle()} popupDenied=${popupDenied} body=${body}`
@@ -361,7 +363,7 @@ async function fail(error) {
 function openExternal(url) {
   const target = externalTarget(url, appUrl);
   if (!target) return false;
-  logLine(`[desktop] opening in the system browser: ${target}`);
+  logLine(`opening in the system browser: ${target}`);
   void shell.openExternal(target);
   return true;
 }
