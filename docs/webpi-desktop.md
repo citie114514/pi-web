@@ -12,6 +12,30 @@ npm run desktop:portable # portable archive with SHA256SUMS
 
 Artifacts land in `release/`.
 
+## Links open in the system browser
+
+A link in the model's output — a GitHub URL, a docs page, a `mailto:` — is handed
+to the operating system's default handler rather than opened in the embedded
+window. The window has no address bar, no extensions, and none of the browser
+sessions the operator is already signed into, so opening a link there is a worse
+experience than a real browser tab.
+
+`desktop/external-links.js` decides where a click goes, and the shell wires both
+navigation paths to it (`setWindowOpenHandler` for new windows and `target="_blank"`,
+`will-navigate` for a plain `<a href>`):
+
+| Clicked URL | Where it goes |
+| --- | --- |
+| The app's own origin (`http://127.0.0.1:<port>/…`) | Stays in the window |
+| `http:`, `https:`, `mailto:` anywhere else | System default handler |
+| Any other scheme (`file:`, `javascript:`, `data:`, `chrome:`, …) | Refused — the page cannot make the shell launch arbitrary schemes |
+
+Loopback on a different port counts as external: it is a different server, not
+the app's UI. The unit tests in `lib/desktop-external-links.test.mjs` pin the
+classification, and the packaged-app smoke check logs `popupDenied=true` to prove
+the handler is registered in the build (it probes with an unsafe scheme so a
+regression fails the check instead of opening a browser during CI).
+
 ## Closing the window
 
 The close button is a product decision, not a window-manager detail, so WebPi

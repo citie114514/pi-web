@@ -12,12 +12,13 @@
 
 const path = require("node:path");
 const fs = require("node:fs");
-const { app, BrowserWindow, Menu, Notification, Tray, dialog, nativeImage } = require("electron");
+const { app, BrowserWindow, Menu, Notification, Tray, dialog, nativeImage, shell } = require("electron");
 
 const { CLOSE_DIALOG, decideCloseAction, needsClosePrompt, normalizeCloseAction } = require("./close-policy");
 const { resolveDataDir } = require("./portable");
 const { createSettingsStore, isPersistableWindowState, normalizeBounds } = require("./settings");
 const { ServerSupervisor } = require("./server-supervisor");
+const { externalTarget, isAppUrl } = require("./external-links");
 const { buildTrayMenuTemplate } = require("./tray-menu");
 
 const PRODUCT = "WebPi Desktop";
@@ -46,6 +47,8 @@ let mainWindow;
 let tray;
 let supervisor;
 let settings;
+// Origin of the served UI; anything else is an external link (see external-links.js).
+let appUrl;
 let quitting = false;
 let stopping = false;
 let trayHintShown = false;
@@ -94,6 +97,7 @@ async function startService(overrides) {
 }
 
 async function loadUI(url) {
+  appUrl = url;
   logLine(`serving ${url} (owned=${supervisor.owned})`);
   if (!mainWindow || mainWindow.isDestroyed()) createWindow();
   await mainWindow.loadURL(url);
@@ -104,7 +108,15 @@ async function loadUI(url) {
     const body = await mainWindow.webContents
       .executeJavaScript("document.body.innerText.slice(0, 60).replace(/\\s+/g, ' ')")
       .catch(() => "");
-    logLine(`[smoke] url=${url} owned=${supervisor.owned} title=${title} window=${mainWindow.getTitle()} body=${body}`);
+    // Canary for the external-link wiring: a popup must be denied by
+    // setWindowOpenHandler. An unsafe scheme is used on purpose so a regression
+    // shows up as popupDenied=false instead of launching a browser during CI.
+    const popupDenied = await mainWindow.webContents
+      .executeJavaScript("window.open('file:///webpi-smoke-probe') === null")
+      .catch(() => false);
+    logLine(
+      `[smoke] url=${url} owned=${supervisor.owned} title=${title} window=${mainWindow.getTitle()} popupDenied=${popupDenied} body=${body}`
+    );
     if (SMOKE_SCREENSHOT) {
       const image = await mainWindow.webContents.capturePage();
       fs.writeFileSync(SMOKE_SCREENSHOT, image.toPNG());
@@ -136,6 +148,20 @@ function createWindow() {
   });
 
   Menu.setApplicationMenu(null);
+
+  // Links in the model's output belong to the system browser. The embedded
+  // window has no address bar, no extensions and no signed-in session, so
+  // opening them here is a worse experience than handing them to the OS.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
+    return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    // The app's own UI keeps navigating in place; everything else goes out.
+    if (isAppUrl(url, appUrl)) return;
+    event.preventDefault();
+    openExternal(url);
+  });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
   // The page sets its own title (the WebPi web UI, plus the active session), so
@@ -324,6 +350,20 @@ async function fail(error) {
 
   dialog.showErrorBox("WebPi 启动失败", detail);
   await quitApp();
+}
+
+/**
+ * Hand a URL to the operating system's default handler.
+ *
+ * Only http, https and mailto are passed on — the page must not be able to make
+ * the shell launch arbitrary schemes — and the app's own UI is never sent out.
+ */
+function openExternal(url) {
+  const target = externalTarget(url, appUrl);
+  if (!target) return false;
+  logLine(`[desktop] opening in the system browser: ${target}`);
+  void shell.openExternal(target);
+  return true;
 }
 
 function assetPath(name) {

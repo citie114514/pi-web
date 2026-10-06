@@ -84,6 +84,7 @@ The desktop build is the same application in its own window, with a tray icon an
 
 - **Starting the app starts the service, quitting the app stops it.** A server this app did not start is never stopped: if another WebPi already serves the port, the app starts its own instance on a free port so that quitting is always safe.
 - **Closing the window asks what to do** — minimize to the tray, or close everything — and can remember the answer. Change it any time from the tray menu.
+- **Links open in your browser**: a URL in the model's output goes to the system default browser, not into the embedded window (only http, https and mailto are handed to the OS).
 - **The tray menu** also shows or hides the window, restarts the service, and quits. If the service exits unexpectedly, a dialog offers to restart it or exit.
 - **Portable mode**: the portable archives keep their settings inside the extracted folder, so the whole folder can be moved to a USB stick. Pi's own data still lives in `~/.pi/agent`.
 
