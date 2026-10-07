@@ -330,7 +330,11 @@ async function quitApp() {
   if (stopping) return;
   stopping = true;
   quitting = true;
-  logLine(`[desktop] quitting app…`);
+  logLine("quitting app…");
+
+  // 立即给反馈：窗口先消失，服务在后台停。否则停止服务的几秒里
+  // 窗口毫无反应，会被当成「关不掉」。
+  mainWindow?.hide();
 
   try {
     saveWindowBounds();
@@ -339,7 +343,7 @@ async function quitApp() {
     logLine(`stop failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  logLine(`[desktop] server stopped; exiting`);
+  logLine("server stopped; exiting");
   app.exit(typeof process.exitCode === "number" ? process.exitCode : 0);
 }
 
@@ -409,8 +413,29 @@ function trayIcon() {
   return image.isEmpty() ? nativeImage.createEmpty() : image;
 }
 
+const DESKTOP_LOG_MAX_BYTES = 256 * 1024;
+
+/**
+ * Log to stdout and to a rolling file in the data directory. The installed app
+ * has no console, so without the file there would be nothing to diagnose from
+ * when something fails on the operator's machine.
+ */
 function logLine(line) {
   process.stdout.write(`[desktop] ${line}\n`);
+  try {
+    const file = path.join(app.getPath("userData"), "desktop.log");
+    let previous = "";
+    if (fs.existsSync(file)) previous = fs.readFileSync(file, "utf8");
+    let combined = `${previous}[${new Date().toISOString()}] ${line}\n`;
+    if (combined.length > DESKTOP_LOG_MAX_BYTES) {
+      combined = combined.slice(combined.length - DESKTOP_LOG_MAX_BYTES);
+      const firstNewline = combined.indexOf("\n");
+      if (firstNewline >= 0) combined = combined.slice(firstNewline + 1);
+    }
+    fs.writeFileSync(file, combined, "utf8");
+  } catch {
+    // 日志写不进去不能影响运行（例如目录被杀软锁定）。
+  }
 }
 
 app.on("before-quit", (event) => {

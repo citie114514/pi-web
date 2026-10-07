@@ -59,7 +59,11 @@ function buildLaunchCommand({
 /** Command that terminates a launcher and everything it started. */
 function buildKillCommand(pid, { platform = process.platform, force = false } = {}) {
   if (platform === "win32") {
-    return { command: "taskkill", args: ["/pid", String(pid), "/T", ...(force ? ["/F"] : [])] };
+    // Windows has no graceful signal semantics, and `taskkill` without /F
+    // cannot stop console apps at all (they have no window to close) — the
+    // graceful stop used to burn its whole 8s timeout on every quit. Always
+    // force-kill the tree; the server gets no chance to wind down either way.
+    return { command: "taskkill", args: ["/pid", String(pid), "/T", "/F"] };
   }
   return { signal: force ? "SIGKILL" : "SIGTERM", pid: -pid };
 }
