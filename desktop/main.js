@@ -260,6 +260,7 @@ async function handleWindowClose(event) {
 }
 
 function applyCloseAction(action) {
+  logLine(`close decision: ${action}`);
   if (action === "tray") {
     hideWindow();
     return;
@@ -329,6 +330,7 @@ async function quitApp() {
   if (stopping) return;
   stopping = true;
   quitting = true;
+  logLine(`[desktop] quitting app…`);
 
   try {
     saveWindowBounds();
@@ -337,6 +339,7 @@ async function quitApp() {
     logLine(`stop failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
+  logLine(`[desktop] server stopped; exiting`);
   app.exit(typeof process.exitCode === "number" ? process.exitCode : 0);
 }
 
