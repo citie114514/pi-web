@@ -1,3 +1,7 @@
+> **这是「应用界面版」**（目标是 Next.js 界面本身）。如果要重制**宣传片**，用
+> [video-redesign-prompt.md](./video-redesign-prompt.md)——判据要从 MP4 里量，
+> 栈是 Remotion 而不是 Tailwind。
+
 # 给 Sonnet 5.5 的元提示词：让它写出一份「能把 WebPi Desktop 做得更好看」的提示词
 
 > 用法：整段复制到 Sonnet 5.5。它不会直接改代码，而是产出一份**可直接交给编码 agent 执行**的提示词。
