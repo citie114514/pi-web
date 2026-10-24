@@ -96,11 +96,25 @@ async function startService(overrides) {
   return url;
 }
 
+/**
+ * Load the app UI and drop the splash screen from the history.
+ *
+ * The window loads splash.html first, so "back" (a mouse side button, a
+ * trackpad swipe, Alt+Left) would walk to it and show "starting the service"
+ * again. Removing the entry means that can never happen.
+ */
+async function loadAppUrl(url) {
+  await mainWindow.loadURL(url);
+  const history = mainWindow.webContents.navigationHistory;
+  if (history && typeof history.clear === "function") history.clear();
+  else if (typeof mainWindow.webContents.clearHistory === "function") mainWindow.webContents.clearHistory();
+}
+
 async function loadUI(url) {
   appUrl = url;
   logLine(`serving ${url} (owned=${supervisor.owned})`);
   if (!mainWindow || mainWindow.isDestroyed()) createWindow();
-  await mainWindow.loadURL(url);
+  await loadAppUrl(url);
 
   if (SMOKE) {
     await delay(1500);
@@ -150,6 +164,14 @@ function createWindow() {
   });
 
   Menu.setApplicationMenu(null);
+
+  // Mouse side buttons arrive as browser-backward / browser-forward. This is not
+  // a browser: ignore them so they cannot walk the window history at all.
+  mainWindow.webContents.on("app-command", (event, command) => {
+    if (command === "browser-backward" || command === "browser-forward") {
+      event.preventDefault();
+    }
+  });
 
   // Links in the model's output belong to the system browser. The embedded
   // window has no address bar, no extensions and no signed-in session, so
@@ -299,7 +321,7 @@ async function restartServer() {
   try {
     const result = await supervisor.restart();
     logLine(`restarted on ${result.url}`);
-    if (mainWindow && !mainWindow.isDestroyed()) await mainWindow.loadURL(result.url);
+    if (mainWindow && !mainWindow.isDestroyed()) await loadAppUrl(result.url);
     notify("WebPi 服务已重启");
   } catch (error) {
     await fail(error);
