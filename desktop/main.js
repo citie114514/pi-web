@@ -443,7 +443,13 @@ const DESKTOP_LOG_MAX_BYTES = 256 * 1024;
  * when something fails on the operator's machine.
  */
 function logLine(line) {
-  process.stdout.write(`[desktop] ${line}\n`);
+  // A GUI launch has no stdout: writing to it throws EPIPE. Logging must never
+  // be the reason the application dies.
+  try {
+    process.stdout.write(`[desktop] ${line}\n`);
+  } catch {
+    // no console attached
+  }
   try {
     const file = path.join(app.getPath("userData"), "desktop.log");
     let previous = "";
