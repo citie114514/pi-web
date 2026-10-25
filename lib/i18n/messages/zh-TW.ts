@@ -369,7 +369,7 @@ export const zhTWLocale: LocalePlugin = {
     "sidebar.worktreePath": "Worktree：{path}",
     "sidebar.removeWorktreeTitle": "移除 worktree checkout {path}；保留分支",
     "sidebar.removeWorktreeHeading": "移除 {name}",
-    "sidebar.brandLabel": "Pi Web，版本：web {app}，pi {pi}",
+    "sidebar.brandLabel": "WebPi，版本：web {app}，pi {pi}",
     "sidebar.tabsLabel": "側邊欄檢視",
     "sidebar.tabSessions": "工作階段",
     "sidebar.tabFiles": "檔案",
