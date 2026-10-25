@@ -19,6 +19,10 @@ const eslintConfig = [
       "react-hooks/immutability": "off",
       "react-hooks/refs": "off",
       "react-hooks/set-state-in-effect": "off",
+      // React Compiler optimisation hints, not correctness: upstream's manual
+      // memoization in ChatInput / ChatMinimap / SkillsConfig / useAgentSession
+      // can't be preserved by the compiler. Same reasoning as the three above.
+      "react-hooks/preserve-manual-memoization": "off",
     },
   },
 ];
