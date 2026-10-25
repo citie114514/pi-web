@@ -38,6 +38,7 @@ const {
   mcpGroupEmptyKey,
   mcpGroupSwitchChecked,
   mcpGroupSwitchTargets,
+  mcpInProjectView,
   mcpOverviewUrl,
   mcpProjectServersLoad,
   mcpProjectTrustable,
@@ -144,8 +145,41 @@ test("a row's state follows the file, the most important reason first", () => {
   const shadowed = server({ shadowedByProject: true });
   assert.equal(mcpServerRowState(shadowed, on), "replaced");
   assert.equal(mcpServerRowState(shadowed, { mcpAvailable: true, projectServersLoad: false }), "on");
+  // One the project's override changes, likewise; the override itself reads as any project entry.
+  const overridden = server({ overriddenByProject: true });
+  assert.equal(mcpServerRowState(overridden, on), "overridden");
+  assert.equal(mcpServerRowState(overridden, { mcpAvailable: true, projectServersLoad: false }), "on");
+  assert.equal(mcpServerRowState(server({ scope: "project", override: { keys: ["enabled"] }, enabled: false }), on), "disabled");
   assert.equal(mcpServerRowState(server(), { mcpAvailable: false, projectServersLoad: true }), "mcp-off");
   assert.deepEqual([...MCP_SERVER_ROW_STATES].sort(), Object.keys(MCP_ROW_STATE_LABEL_KEYS).sort());
+});
+
+test("a global server's \"This project\" row: a switch where the trusted project has no entry of its name, else the override's link", () => {
+  const trust = { requiresTrust: true, trusted: true, decision: true, decisionPath: "/repo", inherited: false };
+  const files = [
+    { scope: "global", path: "/agent/mcp.json", exists: true, problems: [] },
+    { scope: "project", path: "/repo/.pi/mcp.json", exists: true, problems: [] },
+  ];
+  const lint = server({ name: "lint" });
+  const data = (servers, extra = {}) => ({ project: { cwd: "/repo", trust }, files, servers: [lint, ...servers], ...extra });
+  assert.deepEqual(mcpInProjectView(lint, data([])), { kind: "switch" });
+  const override = server({ name: "lint", scope: "project", sourcePath: "/repo/.pi/mcp.json", override: { keys: ["enabled", "exposure"] } });
+  assert.deepEqual(mcpInProjectView({ ...lint, overriddenByProject: true }, data([override])), {
+    kind: "override",
+    key: mcpServerKey(override),
+    keys: ["enabled", "exposure"],
+    applies: true,
+  });
+  assert.equal(mcpInProjectView(lint, data([{ ...override, invalidError: "x" }])).applies, false);
+  // The project's own server of the name replaces it, or pi refuses it: no row.
+  assert.equal(mcpInProjectView(lint, data([server({ name: "lint", scope: "project", sourcePath: "/repo/.pi/mcp.json" })])), undefined);
+  // Only a loaded global server, in a project whose file sessions read and the panel could list.
+  assert.equal(mcpInProjectView({ ...lint, invalidError: "x" }, data([])), undefined);
+  assert.equal(mcpInProjectView(override, data([])), undefined);
+  assert.equal(mcpInProjectView(lint, data([], { project: { cwd: "/repo", trust: { ...trust, decision: null } } })), undefined);
+  assert.equal(mcpInProjectView(lint, data([], { project: undefined })), undefined);
+  assert.equal(mcpInProjectView(lint, data([], { files: [files[0], { ...files[1], problems: [{ reason: "unparsable", error: "x" }] }] })), undefined);
+  assert.deepEqual(mcpInProjectView(lint, data([], { files: [files[0], { ...files[1], problems: [{ reason: "auto-enable-codemode-invalid", error: "x" }] }] })), { kind: "switch" });
 });
 
 test("project servers load only under a trust decision, as the MCP host reads it", () => {
@@ -1112,9 +1146,12 @@ test("an open session's report refines a row as a test's does, in a session's wo
   assert.equal(mcpRowStateLabelKey("connected", { origin: "test", state: "connected" }), "mcp.state.connected");
   assert.equal(mcpRowStateLabelKey("needs-auth", report("needs-auth")), "mcp.state.needs-auth");
   assert.equal(mcpRowStateLabelKey("disabled", report("connected")), "mcp.state.disabled");
-  // The Connection row reports what a test or a session saw; the Status row adds no sentence of its own.
+  // The status lines say what a test or a session saw; the state adds no sentence of its own.
   for (const state of ["connected", "needs-auth", "failed", "connecting"]) assert.equal(mcpRowStateDetailKey(state), undefined, state);
+  // Nor where its label already says why it does not connect.
+  for (const state of ["disabled", "not-trusted", "replaced", "overridden", "mcp-off", "on"]) assert.equal(mcpRowStateDetailKey(state), undefined, state);
   assert.equal(mcpRowStateDetailKey("conflict"), "mcp.stateDetail.conflict");
+  assert.equal(mcpRowStateDetailKey("disconnected"), "mcp.stateDetail.disconnected");
   assert.equal(mcpRowStateDetailKey("invalid"), undefined, "the pane words a refusal with its reason");
   assert.deepEqual(mcpSessionStateView(report("disconnected")), { key: "mcp.session.state.disconnected", tone: "warning" });
   assert.deepEqual(mcpSessionStateView(report("not-trusted")), { key: "mcp.session.state.not-trusted", tone: "warning" });
@@ -1140,7 +1177,7 @@ test("an open session's report refines a row as a test's does, in a session's wo
   assert.equal(mcpWithTestResults(data, answer(4_000)).servers[0].status.state, "connected");
 });
 
-test("a connection a session closed since reads like an untested entry, and its Connection row says when it closed", () => {
+test("a connection a session closed since reads like an untested entry, and its Status row says when it closed", () => {
   const closed = { origin: "session", state: "connected", sessionId: "s", cwd: "/repo", updatedAt: 3_000, closedAt: 9_000 };
   assert.equal(mcpStatusRowState(closed), "on");
   assert.equal(mcpServerRowState(server({ status: closed }), on), "on");

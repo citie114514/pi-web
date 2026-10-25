@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { SelectorRow } from "./SelectorRow";
@@ -15,6 +15,8 @@ interface ModelSelectorProps {
   options: ModelSelectorOption[];
   value?: { provider: string; modelId: string } | null;
   onChange: (provider: string, modelId: string) => void;
+  /** Live sessions can reapply saved metadata by choosing their current model again. */
+  onReselect?: (provider: string, modelId: string) => void;
   onClear?: () => void;
   emptyLabel?: string;
   selectedLabel?: string;
@@ -31,20 +33,13 @@ interface ModelSelectorProps {
 }
 
 const MODEL_FILTER_THRESHOLD = 8;
-const MODEL_OPTION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-
-function compareModelOptions(a: ModelSelectorOption, b: ModelSelectorOption): number {
-  return MODEL_OPTION_COLLATOR.compare(a.name || a.modelId, b.name || b.modelId)
-    || MODEL_OPTION_COLLATOR.compare(a.provider, b.provider)
-    || MODEL_OPTION_COLLATOR.compare(a.modelId, b.modelId);
-}
 
 export function filterModelOptions(options: ModelSelectorOption[], query: string): ModelSelectorOption[] {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) return options;
 
   return options.filter((option) => (
-    `${option.name} ${option.modelId}`
+    `${option.name} ${option.modelId} ${option.provider}/${option.modelId}`
       .toLocaleLowerCase()
       .includes(normalizedQuery)
   ));
@@ -54,6 +49,7 @@ export function ModelSelector({
   options,
   value,
   onChange,
+  onReselect,
   onClear,
   emptyLabel,
   selectedLabel,
@@ -74,9 +70,10 @@ export function ModelSelector({
   const [anchorRect, setAnchorRect] = useState<{ top: number; right: number; bottom: number; left: number; width: number } | null>(null);
   const [filter, setFilter] = useState("");
   const locked = disabled || busy;
-  const sortedOptions = useMemo(() => [...options].sort(compareModelOptions), [options]);
-  const filteredOptions = filterModelOptions(sortedOptions, filter);
-  const showFilter = sortedOptions.length > MODEL_FILTER_THRESHOLD;
+  // Options arrive in pi's /model order (orderSelectorModels()); never re-sort
+  // them, or a models.json provider loses the order its file gives (#783).
+  const filteredOptions = filterModelOptions(options, filter);
+  const showFilter = options.length > MODEL_FILTER_THRESHOLD;
   const modelsByProvider: { provider: string; options: ModelSelectorOption[] }[] = [];
 
   for (const option of filteredOptions) {
@@ -86,8 +83,8 @@ export function ModelSelector({
   }
 
   const currentName = selectedLabel ?? (value
-    ? sortedOptions.find((option) => option.modelId === value.modelId && option.provider === value.provider)?.name ?? value.modelId
-    : emptyLabel ?? (sortedOptions.length > 0 ? "Select model" : "No models"));
+    ? options.find((option) => option.modelId === value.modelId && option.provider === value.provider)?.name ?? value.modelId
+    : emptyLabel ?? (options.length > 0 ? "Select model" : "No models"));
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -102,6 +99,31 @@ export function ModelSelector({
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
+
+  // While the picker is open, a phone keyboard shrinks the app height
+  // (useViewportHeight writes the root's style, sometimes with no viewport
+  // event) and moves the trigger; follow it instead of the rect from the tap.
+  useEffect(() => {
+    if (!open) return;
+    const remeasure = () => {
+      const rect = rootRef.current?.querySelector("button")?.getBoundingClientRect();
+      // A new object even for an unmoved trigger: the panel also reads the
+      // visual viewport, which may have changed alone.
+      if (rect?.height) setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
+    };
+    const viewport = window.visualViewport;
+    const rootObserver = new MutationObserver(remeasure);
+    rootObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-keyboard-open"] });
+    window.addEventListener("resize", remeasure);
+    viewport?.addEventListener("resize", remeasure);
+    viewport?.addEventListener("scroll", remeasure);
+    return () => {
+      rootObserver.disconnect();
+      window.removeEventListener("resize", remeasure);
+      viewport?.removeEventListener("resize", remeasure);
+      viewport?.removeEventListener("scroll", remeasure);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!locked) return;
@@ -152,6 +174,7 @@ export function ModelSelector({
     setOpen(false);
     setFilter("");
     if (!active || isAutoSelection) onChange(option.provider, option.modelId);
+    else onReselect?.(option.provider, option.modelId);
   };
 
   const saveDefault = (option: ModelSelectorOption) => {
@@ -180,7 +203,7 @@ export function ModelSelector({
         aria-expanded={open}
         aria-busy={busy || undefined}
         disabled={locked}
-        title={busy ? "Switching model" : locked ? currentName : sortedOptions.length > 0 || onClear ? "Change model" : "No available models"}
+        title={busy ? "Switching model" : locked ? currentName : options.length > 0 || onClear ? "Change model" : "No available models"}
         style={buttonStyle}
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
@@ -228,14 +251,21 @@ export function ModelSelector({
       </button>
 
       {open && anchorRect && (() => {
+        // Fixed coordinates belong to the layout viewport, which a phone
+        // keyboard does not shrink: measure from the visible part's top and
+        // hang an upward panel from `top` rather than from `bottom`.
+        const viewportTop = window.visualViewport?.offsetTop ?? 0;
         const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
         const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-        const spaceAbove = anchorRect.top - 8;
-        const spaceBelow = viewportHeight - anchorRect.bottom - 8;
+        // A trigger the keyboard covers (a Settings field) still gets a
+        // panel ending above the keyboard.
+        const aboveEnd = Math.min(anchorRect.top - 6, viewportTop + viewportHeight - 8);
+        const spaceAbove = aboveEnd - viewportTop - 8;
+        const spaceBelow = viewportTop + viewportHeight - anchorRect.bottom - 6 - 8;
         const openAbove = placement === "up" || spaceAbove > spaceBelow;
         const maxHeight = Math.max(120, Math.min(openAbove ? spaceAbove : spaceBelow, viewportHeight * 0.6));
-        const verticalPosition = openAbove
-          ? { bottom: viewportHeight - anchorRect.top + 6 }
+        const verticalPosition: CSSProperties = openAbove
+          ? { top: aboveEnd, transform: "translateY(-100%)" }
           : { top: anchorRect.bottom + 6 };
         const horizontalPosition: CSSProperties = isMobile
           ? { left: 8, right: 8, maxWidth: "calc(100vw - 16px)" }

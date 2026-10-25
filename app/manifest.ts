@@ -1,10 +1,13 @@
 import type { MetadataRoute } from "next";
 
+export const dynamic = "force-dynamic";
+
 export default function manifest(): MetadataRoute.Manifest {
+  const appName = process.env.PI_WEB_APP_NAME?.trim() || "WebPi";
   return {
     id: "/",
-    name: "WebPi",
-    short_name: "WebPi",
+    name: appName,
+    short_name: appName,
     description: "Local web interface for the pi coding agent",
     start_url: "/",
     scope: "/",

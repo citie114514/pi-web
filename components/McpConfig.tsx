@@ -22,6 +22,7 @@ import { displayPathWithin, shortenPath } from "@/lib/display-path";
 import {
   mcpFieldLabel,
   mcpFileProblemDetail,
+  mcpOverrideNotice,
   mcpServerHasHiddenCharacters,
   mcpServerTarget,
   mcpVariableChips,
@@ -95,6 +96,7 @@ import {
   mcpGroupEmptyKey,
   mcpGroupSwitchChecked,
   mcpGroupSwitchTargets,
+  mcpInProjectView,
   mcpProjectTrustable,
   mcpRowContext,
   mcpRowStateDetailKey,
@@ -107,6 +109,7 @@ import {
   mcpSessionStateView,
   mcpSessionSummaryKey,
   mcpStatusDot,
+  mcpStatusRowState,
   mcpStatusTimeText,
   mcpTestAnswerOutdates,
   mcpTestBlock,
@@ -136,10 +139,13 @@ import {
   type McpActionRequest,
   type McpActionResult,
   type McpAutoEnableCodemode,
+  type McpInProjectView,
   type McpLoadFailure,
   type McpNoticeText,
   type McpRowContext,
   type McpServerGroup,
+  type McpServerRowState,
+  type McpStateTone,
   type McpTestBlock,
   type McpTestRun,
   type McpWriteBlock,
@@ -550,7 +556,7 @@ export function McpConfig({
   }, [activeFlowsKey, pollRound]);
 
   // A sign-in that ended changed mcp-auth.json and recorded what connecting
-  // found: the overview is read again, for Signed in and the Connection row.
+  // found: the overview is read again, for Signed in and the Status row.
   const previousSignInsRef = useRef(signIns);
   useEffect(() => {
     const previous = previousSignInsRef.current;
@@ -590,6 +596,18 @@ export function McpConfig({
     setActionError(null);
     setGroupStatus(null);
     const result = await runAction({ action: enabled ? "enable" : "disable", scope: server.scope, name: server.name }, `switch:${key}`);
+    if (!result) return;
+    if (!result.ok) setActionError({ key, failure: result.error });
+    setFocusBack({ control: pressed });
+  }, [runAction]);
+
+  // A global server on or off in this project alone: an override in its .pi/mcp.json, like a switch.
+  const switchServerInProject = useCallback(async (server: McpServerInfo, enabled: boolean) => {
+    const key = mcpServerKey(server);
+    const pressed = pressedButton();
+    setActionError(null);
+    setGroupStatus(null);
+    const result = await runAction({ action: "set-in-project", name: server.name, enabled }, `in-project:${key}`);
     if (!result) return;
     if (!result.ok) setActionError({ key, failure: result.error });
     setFocusBack({ control: pressed });
@@ -793,6 +811,7 @@ export function McpConfig({
       onCodemodeModeChange={(mode) => void saveCodemodeMode(mode)}
       onCodemodeInlineBudgetSave={(budget) => void saveCodemodeInlineBudget(budget)}
       onServerSwitch={(server, enabled) => void switchServer(server, enabled)}
+      onServerSwitchInProject={(server, enabled) => void switchServerInProject(server, enabled)}
       onExposureChange={(server, exposure) => void setServerExposure(server, exposure)}
       onGroupSwitch={(scope, servers, enabled) => void switchGroup(scope, servers, enabled)}
       onRemove={(server) => void removeServer(server)}
@@ -837,6 +856,7 @@ export function McpConfigView({
   onCodemodeModeChange = () => {},
   onCodemodeInlineBudgetSave = () => {},
   onServerSwitch = () => {},
+  onServerSwitchInProject = () => {},
   onExposureChange = () => {},
   onGroupSwitch = () => {},
   onRemove = () => {},
@@ -855,7 +875,7 @@ export function McpConfigView({
   refreshing: boolean;
   embedded: boolean;
   codemodeSave?: McpCodemodeSaveState;
-  /** The change on its way, if any: `switch:<key>`, `remove:<key>`, `sign-out:<key>`, `group:<scope>` or `undo`. */
+  /** The change on its way, if any: `switch:<key>`, `in-project:<key>`, `remove:<key>`, `sign-out:<key>`, `group:<scope>` or `undo`. */
   busy?: string | null;
   actionError?: McpActionErrorState | null;
   groupStatus?: McpGroupStatus | null;
@@ -884,6 +904,8 @@ export function McpConfigView({
   /** Saves the global `codemode.inlineBudget`; null removes it, for pi's default. */
   onCodemodeInlineBudgetSave?: (budget: number | null) => void;
   onServerSwitch?: (server: McpServerInfo, enabled: boolean) => void;
+  /** Turns a global server on or off in the listed project alone. */
+  onServerSwitchInProject?: (server: McpServerInfo, enabled: boolean) => void;
   onExposureChange?: (server: McpServerInfo, exposure: McpExposure) => void;
   onGroupSwitch?: (scope: McpScope, servers: McpServerInfo[], enabled: boolean) => void;
   onRemove?: (server: McpServerInfo) => void;
@@ -1117,6 +1139,8 @@ export function McpConfigView({
                 toolSearchDisabled={data.toolSearchDisabled}
                 autoEnable={autoEnable}
                 block={writeBlock(selectedServer.scope)}
+                inProject={mcpInProjectView(selectedServer, data)}
+                inProjectBlock={writeBlock("project")}
                 savedWhileOff={!data.mcp.available && !writesOff}
                 busy={busy}
                 controlsBusy={controlsBusy}
@@ -1127,6 +1151,12 @@ export function McpConfigView({
                 signInBlock={mcpSignInBlock(selectedServer, data)}
                 signOutBlock={mcpSignOutBlock(selectedServer, data)}
                 onSwitch={onServerSwitch}
+                onSwitchInProject={onServerSwitchInProject}
+                onShowServer={(key) => {
+                  onSelect(key);
+                  // The pane the button sat in goes with the selection: focus follows to the row now selected.
+                  requestAnimationFrame(() => focusIfLost(document, focusFallback()));
+                }}
                 onExposureChange={onExposureChange}
                 onRemove={onRemove}
                 onTest={onTest}
@@ -1378,21 +1408,6 @@ function McpNameList({ names }: { names: readonly string[] }) {
   );
 }
 
-/** The sentence under a server's state: why it does or does not connect. */
-function McpStateDetail({ server, state }: { server: McpServerInfo; state: ReturnType<typeof mcpServerRowState> }) {
-  const { t } = useI18n();
-  if (state === "invalid") {
-    return (
-      <span className="mcp-config-line is-warning">
-        {t("mcp.server.invalid")} <code className="mcp-config-chip">{revealHiddenCharacters(server.invalidError ?? "")}</code>
-      </span>
-    );
-  }
-  // None for web-password: the PI_WEB_PASSWORD line, which every state shows, says it.
-  const key = mcpRowStateDetailKey(state);
-  return key ? <span className="mcp-config-line">{t(key)}</span> : null;
-}
-
 function McpServerDetail({
   server,
   context,
@@ -1400,6 +1415,8 @@ function McpServerDetail({
   toolSearchDisabled,
   autoEnable,
   block,
+  inProject,
+  inProjectBlock,
   savedWhileOff,
   busy,
   controlsBusy,
@@ -1410,6 +1427,8 @@ function McpServerDetail({
   signInBlock,
   signOutBlock,
   onSwitch,
+  onSwitchInProject,
+  onShowServer,
   onExposureChange,
   onRemove,
   onTest,
@@ -1425,6 +1444,10 @@ function McpServerDetail({
   autoEnable: McpAutoEnableCodemode;
   /** Why this server cannot be changed here. */
   block: McpWriteBlock | undefined;
+  /** A global server's "This project" row (`mcpInProjectView()`), when it has one. */
+  inProject: McpInProjectView | undefined;
+  /** Why the project's file cannot be changed here. */
+  inProjectBlock: McpWriteBlock | undefined;
   /** MCP is off by `-builtin:mcp`: changes are written, but no session connects these servers. */
   savedWhileOff: boolean;
   busy: string | null;
@@ -1441,6 +1464,8 @@ function McpServerDetail({
   signInBlock: McpTestBlock | undefined;
   signOutBlock: McpTestBlock | undefined;
   onSwitch: (server: McpServerInfo, enabled: boolean) => void;
+  onSwitchInProject: (server: McpServerInfo, enabled: boolean) => void;
+  onShowServer: (key: string) => void;
   onExposureChange: (server: McpServerInfo, exposure: McpExposure) => void;
   onRemove: (server: McpServerInfo) => void;
   onTest: (server: McpServerInfo) => void;
@@ -1453,14 +1478,17 @@ function McpServerDetail({
   const noteId = useId();
   const testBlockId = useId();
   const state = mcpServerRowState(server, context);
-  const tone = mcpRowStateTone(state);
   const target = mcpServerTarget(server);
+  // What a connected test listed goes under the Tools row's choice; a session lists nothing here.
+  const status = server.status;
+  const listed = status?.origin === "test" && status.state === "connected" && status.toolCount > 0 ? status : undefined;
   // A refused entry never connects, so nothing in it runs or is sent.
   const connects = server.invalidError === undefined;
   const http = server.transport === "http" || (server.transport === undefined && server.url !== undefined);
   const stdio = !http && (server.transport === "stdio" || server.command !== undefined);
   const reachNotice = server.exposure ? mcpExposureReachNotice(server.exposure, { codemode, toolSearchDisabled }, autoEnable) : undefined;
   const exposureId = useId();
+  const inProjectNoteId = useId();
   const key = mcpServerKey(server);
   const name = revealHiddenCharacters(server.name);
   // The route never turns on an entry that references PI_WEB_PASSWORD; turning one off still works.
@@ -1517,36 +1545,25 @@ function McpServerDetail({
       )}
 
       <ConfigDetailGrid>
-        <ConfigDetailGridRow label={t("i18n.status")} tone="plain">
-          <span className="mcp-config-lines">
-            <span className={`mcp-config-state is-${tone}`}>{t(mcpRowStateLabelKey(state, server.status))}</span>
-            <McpStateDetail server={server} state={state} />
-            {server.webPasswordField && (
-              <span className="mcp-config-line is-warning">
-                {t("mcp.server.webPassword")} <McpFieldChips fields={[server.webPasswordField]} />
-              </span>
-            )}
-          </span>
-        </ConfigDetailGridRow>
-        <McpConnectionRows server={server} test={test} testBlock={testBlock} testBlockId={testBlockId} />
+        <McpStatusRow server={server} state={state} test={test} testBlock={testBlock} testBlockId={testBlockId} />
         {server.description !== undefined && (
           <ConfigDetailGridRow label={t("mcp.detail.description")} tone="plain">
             {revealHiddenCharacters(server.description)}
           </ConfigDetailGridRow>
         )}
-        {server.transport && (
+        {/* The URL or Command label says the transport; it has a row of its own only without either. */}
+        {target !== undefined ? (
+          <ConfigDetailGridRow label={http ? t("mcp.detail.url") : t("mcp.detail.command")} tone="plain" mono className="mcp-config-code">
+            {target}
+          </ConfigDetailGridRow>
+        ) : server.transport && (
           <ConfigDetailGridRow label={t("mcp.detail.transport")}>
             {t(`mcp.transport.${server.transport}`)}
           </ConfigDetailGridRow>
         )}
-        {target !== undefined && (
-          <ConfigDetailGridRow label={http ? t("mcp.detail.url") : t("mcp.detail.command")} tone="plain" mono>
-            {target}
-          </ConfigDetailGridRow>
-        )}
         {/* Left out when not set: the server then runs in the session's folder, with no env or headers of its own. */}
         {stdio && server.cwd !== undefined && (
-          <ConfigDetailGridRow label={t("mcp.detail.cwd")} mono>{revealHiddenCharacters(server.cwd)}</ConfigDetailGridRow>
+          <ConfigDetailGridRow label={t("mcp.detail.cwd")} mono className="mcp-config-code">{revealHiddenCharacters(server.cwd)}</ConfigDetailGridRow>
         )}
         {stdio && server.envNames.length > 0 && (
           <ConfigDetailGridRow label={t("mcp.detail.env")}>
@@ -1597,40 +1614,77 @@ function McpServerDetail({
             onCancel={onSignInCancel}
           />
         )}
-        {server.exposure && (
+        {(server.exposure || listed) && (
           <ConfigDetailGridRow label={t("mcp.detail.exposure")} tone="plain">
             <span className="mcp-config-lines">
-              <span className="mcp-exposure-choice">
-                <select
-                  className="mcp-add-input mcp-exposure-select"
-                  aria-label={t("mcp.exposure.label", { name })}
-                  aria-describedby={[exposureId, block ? noteId : null].filter(Boolean).join(" ")}
-                  value={server.exposure}
-                  disabled={controlsBusy || block !== undefined}
-                  onChange={(event) => {
-                    const exposure = event.target.value as McpExposure;
-                    if (exposure !== server.exposure) onExposureChange(server, exposure);
-                  }}
-                >
-                  {MCP_EXPOSURE_OPTIONS.map((exposure) => (
-                    <option key={exposure} value={exposure}>
-                      {exposure === "codemode"
-                        ? t("mcp.exposure.optionDefault", { label: t(MCP_EXPOSURE_SHORT_KEYS[exposure]) })
-                        : t(MCP_EXPOSURE_SHORT_KEYS[exposure])}
-                    </option>
-                  ))}
-                </select>
-                {busy === `exposure:${key}` && <span role="status" className="mcp-config-line is-dim">{t("i18n.saving")}</span>}
-              </span>
-              <span id={exposureId} className="mcp-config-line">{t(MCP_EXPOSURE_KEYS[server.exposure])}</span>
-              {server.toolExposureCount !== undefined && (
-                <span className="mcp-config-line is-dim">{t("mcp.exposure.toolOverrides", { count: server.toolExposureCount })}</span>
+              {server.exposure && (
+                <>
+                  <span className="mcp-exposure-choice">
+                    <select
+                      className="mcp-add-input mcp-exposure-select"
+                      aria-label={t("mcp.exposure.label", { name })}
+                      aria-describedby={[exposureId, block ? noteId : null].filter(Boolean).join(" ")}
+                      value={server.exposure}
+                      disabled={controlsBusy || block !== undefined}
+                      onChange={(event) => {
+                        const exposure = event.target.value as McpExposure;
+                        if (exposure !== server.exposure) onExposureChange(server, exposure);
+                      }}
+                    >
+                      {MCP_EXPOSURE_OPTIONS.map((exposure) => (
+                        <option key={exposure} value={exposure}>
+                          {exposure === "codemode"
+                            ? t("mcp.exposure.optionDefault", { label: t(MCP_EXPOSURE_SHORT_KEYS[exposure]) })
+                            : t(MCP_EXPOSURE_SHORT_KEYS[exposure])}
+                        </option>
+                      ))}
+                    </select>
+                    {busy === `exposure:${key}` && <span role="status" className="mcp-config-line is-dim">{t("i18n.saving")}</span>}
+                  </span>
+                  <span id={exposureId} className="mcp-config-line">{t(MCP_EXPOSURE_KEYS[server.exposure])}</span>
+                  {server.toolExposureCount !== undefined && (
+                    <span className="mcp-config-line is-dim">{t("mcp.exposure.toolOverrides", { count: server.toolExposureCount })}</span>
+                  )}
+                  {reachNotice && <span className="mcp-config-line is-warning">{noticeText(reachNotice, t)}</span>}
+                </>
               )}
-              {reachNotice && <span className="mcp-config-line is-warning">{noticeText(reachNotice, t)}</span>}
+              {listed && <McpTestToolList status={listed} serverExposure={server.exposure} />}
             </span>
           </ConfigDetailGridRow>
         )}
-        <ConfigDetailGridRow label={t("mcp.detail.file")} tone="dim" mono>
+        {inProject && (
+          <ConfigDetailGridRow label={t("mcp.detail.inProject")} tone="plain">
+            <span className="mcp-config-lines">
+              {inProject.kind === "override" ? (
+                <>
+                  <span className="mcp-config-line">
+                    {inProject.applies ? t("mcp.inProject.overridden", { keys: inProject.keys.join(", ") }) : t("mcp.inProject.refused")}
+                  </span>
+                  <span>
+                    <ConfigButton size="small" onClick={() => onShowServer(inProject.key)}>{t("mcp.inProject.show")}</ConfigButton>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    <ConfigButton
+                      size="small"
+                      disabled={controlsBusy || inProjectBlock !== undefined || passwordKeepsOff}
+                      aria-describedby={[inProjectNoteId, inProjectBlock || passwordKeepsOff ? noteId : null].filter(Boolean).join(" ")}
+                      onClick={() => onSwitchInProject(server, !server.enabled)}
+                    >
+                      {busy === `in-project:${key}`
+                        ? t("i18n.saving")
+                        : t(server.enabled ? "mcp.inProject.turnOff" : "mcp.inProject.turnOn")}
+                    </ConfigButton>
+                  </span>
+                  <span id={inProjectNoteId} className="mcp-config-line is-dim">{t("mcp.inProject.saved")}</span>
+                </>
+              )}
+            </span>
+          </ConfigDetailGridRow>
+        )}
+        <ConfigDetailGridRow label={t("mcp.detail.file")} tone="dim" mono className="mcp-config-code">
           {displayPath(server.sourcePath)}
         </ConfigDetailGridRow>
       </ConfigDetailGrid>
@@ -1641,8 +1695,12 @@ function McpServerDetail({
         )}
         {!server.validated && <p className="mcp-config-line is-warning">{t("mcp.server.unchecked")}</p>}
         {server.replacesGlobal && <p className="mcp-config-line is-warning">{t("mcp.server.replacesGlobal")}</p>}
+        {server.override && <p className="mcp-config-line">{noticeText(mcpOverrideNotice(server.override.keys), t)}</p>}
         {server.shadowedByProject && state !== "replaced" && (
           <p className="mcp-config-line">{t("mcp.server.shadowedByProject")}</p>
+        )}
+        {server.overriddenByProject && state !== "overridden" && (
+          <p className="mcp-config-line">{t("mcp.server.overriddenByProject")}</p>
         )}
         {server.masked && <p className="mcp-config-line is-dim">{t("mcp.server.masked")}</p>}
       </div>
@@ -1682,21 +1740,47 @@ function McpStatusOutput({ error, stderr }: { error?: string; stderr?: string })
   );
 }
 
-/** The last known status: a test's or an open session's. */
-function McpStatusLines({ status }: { status: McpServerStatus }) {
-  return status.origin === "session" ? <McpSessionStatusLines status={status} /> : <McpTestStatusLines status={status} />;
+/**
+ * The last known status: a test's or an open session's. `showState` adds the
+ * status's own state word, needed only when the entry's state came from
+ * elsewhere (a switched-off entry that was tested, a connection a session
+ * closed since).
+ */
+function McpStatusLines({ status, showState, entryCwd }: { status: McpServerStatus; showState: boolean; entryCwd: string | undefined }) {
+  return status.origin === "session"
+    ? <McpSessionStatusLines status={status} showState={showState} />
+    : <McpTestStatusLines status={status} showState={showState} entryCwd={entryCwd} />;
 }
 
-/** What the last test found: its state with when and how long, the error and stderr, and what the server said about itself. */
-function McpTestStatusLines({ status }: { status: McpServerStatus & { origin: "test" } }) {
+/** A status's state word, before its summary. */
+function McpStatusStateWord({ view }: { view: { key: string; tone: McpStateTone } }) {
+  const { t } = useI18n();
+  return <><span className={`mcp-config-state is-${view.tone}`}>{t(view.key)}</span>{" "}</>;
+}
+
+/**
+ * What the last test found: when and how long, the error and stderr, and what
+ * the server said about itself; that it offers resources when it does, and
+ * the folder a stdio server ran in unless the Working directory row names
+ * that very folder.
+ */
+function McpTestStatusLines({
+  status,
+  showState,
+  entryCwd,
+}: {
+  status: McpServerStatus & { origin: "test" };
+  showState: boolean;
+  /** The entry's own `cwd`, as written. */
+  entryCwd: string | undefined;
+}) {
   const { t, locale } = useI18n();
-  const view = mcpTestStateView(status);
   const time = mcpStatusTimeText(status.testedAt, locale);
   const info = status.serverInfo;
   return (
     <>
       <span className="mcp-config-line">
-        <span className={`mcp-config-state is-${view.tone}`}>{t(view.key)}</span>{" "}
+        {showState && <McpStatusStateWord view={mcpTestStateView(status)} />}
         {t(mcpTestSummaryKey(status), { count: status.toolCount, seconds: mcpSeconds(status.durationMs), time })}
       </span>
       <McpStatusOutput error={status.error} stderr={status.stderr} />
@@ -1705,12 +1789,10 @@ function McpTestStatusLines({ status }: { status: McpServerStatus & { origin: "t
           {t("mcp.test.serverInfo", { name: revealHiddenCharacters(info.title ?? info.name), version: revealHiddenCharacters(info.version) })}
         </span>
       )}
-      {status.resources !== undefined && (
-        <span className="mcp-config-line is-dim">
-          {t("mcp.test.resources", { resources: status.resources, templates: status.resourceTemplates ?? 0 })}
-        </span>
+      {status.resources && <span className="mcp-config-line is-dim">{t("mcp.test.resources")}</span>}
+      {status.cwd !== undefined && status.cwd !== entryCwd && (
+        <span className="mcp-config-line is-dim">{t("mcp.test.ranIn", { path: displayPath(status.cwd) })}</span>
       )}
-      {status.cwd !== undefined && <span className="mcp-config-line is-dim">{t("mcp.test.ranIn", { path: displayPath(status.cwd) })}</span>}
       {status.queuedMs !== undefined && status.queuedMs >= 500 && (
         <span className="mcp-config-line is-dim">{t("mcp.test.queued", { seconds: mcpSeconds(status.queuedMs) })}</span>
       )}
@@ -1724,15 +1806,14 @@ function McpTestStatusLines({ status }: { status: McpServerStatus & { origin: "t
  * why where it says: the error and stderr, or the extension that holds the
  * name. A connection the session has closed since says when it closed.
  */
-function McpSessionStatusLines({ status }: { status: McpSessionStatus }) {
+function McpSessionStatusLines({ status, showState }: { status: McpSessionStatus; showState: boolean }) {
   const { t, locale } = useI18n();
-  const view = mcpSessionStateView(status);
   const time = mcpStatusTimeText(status.updatedAt, locale);
   const closedTime = status.closedAt === undefined ? undefined : mcpStatusTimeText(status.closedAt, locale);
   return (
     <>
       <span className="mcp-config-line">
-        <span className={`mcp-config-state is-${view.tone}`}>{t(view.key)}</span>{" "}
+        {showState && <McpStatusStateWord view={mcpSessionStateView(status)} />}
         {t(mcpSessionSummaryKey(status), { path: displayPath(status.cwd), time, ...(closedTime === undefined ? {} : { closedTime }) })}
       </span>
       {status.conflict !== undefined && (
@@ -1774,7 +1855,7 @@ function McpTestToolList({ status, serverExposure }: { status: McpServerStatus &
  * Test, in the detail header: one connection through `POST /api/mcp/test`. It
  * writes no file, so a change on its way does not hold it; disabled while its
  * test runs, or where the route would refuse it, pointing at that reason in
- * the Connection row.
+ * the Status row.
  */
 function McpTestButton({
   server,
@@ -1786,7 +1867,7 @@ function McpTestButton({
   server: McpServerInfo;
   test: McpTestRun | undefined;
   testBlock: McpTestBlock | undefined;
-  /** The id of the Connection row's line that says why Test cannot be used. */
+  /** The id of the Status row's line that says why Test cannot be used. */
   describedBy: string;
   onTest: (server: McpServerInfo) => void;
 }) {
@@ -1815,42 +1896,71 @@ function McpTestButton({
   );
 }
 
-/** The Connection row: the last status, why Test cannot be used, and what the last test request did; then the tools a test listed. */
-function McpConnectionRows({
+/**
+ * The Status row: the entry's state, why a refused entry is refused, then
+ * what the last test or open session saw, what to do about it where the label
+ * does not say (`mcpRowStateDetailKey()`), why Test cannot be used, and what
+ * the last test request did. The status's own state word is left out when
+ * that status is what gave the entry its state, which the label has just
+ * said. Test points at the line saying why it cannot be used: the refusal's
+ * own line for a refused entry or one that references PI_WEB_PASSWORD, which
+ * would otherwise be said twice.
+ */
+function McpStatusRow({
   server,
+  state,
   test,
   testBlock,
   testBlockId,
 }: {
   server: McpServerInfo;
+  state: McpServerRowState;
   test: McpTestRun | undefined;
   testBlock: McpTestBlock | undefined;
   testBlockId: string;
 }) {
   const { t } = useI18n();
   const status = server.status;
+  const stateDetail = mcpRowStateDetailKey(state);
+  // The refusal's own line, when it already says why Test cannot be used.
+  const blockSaidBy = testBlock === "invalid" && state === "invalid"
+    ? "state"
+    : testBlock === "web-password" && server.webPasswordField !== undefined
+      ? "password"
+      : undefined;
   return (
-    <>
-      <ConfigDetailGridRow label={t("mcp.detail.connection")} tone="plain">
-        <span className="mcp-config-lines">
-          {status ? <McpStatusLines status={status} /> : <span className="mcp-config-line">{t("mcp.test.never")}</span>}
-          {test?.queueTimedOut && <span role="alert" className="mcp-config-line is-error">{t("mcp.test.queueTimedOut")}</span>}
-          {test?.error && (
-            <span role="alert" className="mcp-config-line is-error">
-              {t("mcp.test.requestFailed")} {testFailureText(test.error, t)}
-            </span>
-          )}
-          {testBlock && <span id={testBlockId} className="mcp-config-line is-dim">{t(MCP_TEST_BLOCK_KEYS[testBlock])}</span>}
-          {/* Its own line, so no locale has to join two sentences with a space. */}
-          {!testBlock && server.commandFields.length > 0 && <span className="mcp-config-line is-dim">{t(MCP_TEST_SERIAL_KEY)}</span>}
-        </span>
-      </ConfigDetailGridRow>
-      {status?.origin === "test" && status.state === "connected" && status.toolCount > 0 && (
-        <ConfigDetailGridRow label={t("mcp.detail.listedTools")} tone="plain">
-          <McpTestToolList status={status} serverExposure={server.exposure} />
-        </ConfigDetailGridRow>
-      )}
-    </>
+    <ConfigDetailGridRow label={t("i18n.status")} tone="plain">
+      <span className="mcp-config-lines">
+        <span className={`mcp-config-state is-${mcpRowStateTone(state)}`}>{t(mcpRowStateLabelKey(state, status))}</span>
+        {state === "invalid" && (
+          <span id={blockSaidBy === "state" ? testBlockId : undefined} className="mcp-config-line is-warning">
+            {t("mcp.server.invalid")} <code className="mcp-config-chip">{revealHiddenCharacters(server.invalidError ?? "")}</code>
+          </span>
+        )}
+        {/* Whatever the state: it is also why a web-password entry's state has no sentence of its own. */}
+        {server.webPasswordField && (
+          <span id={blockSaidBy === "password" ? testBlockId : undefined} className="mcp-config-line is-warning">
+            {t("mcp.server.webPassword")} <McpFieldChips fields={[server.webPasswordField]} />
+          </span>
+        )}
+        {status
+          ? <McpStatusLines status={status} showState={mcpStatusRowState(status) !== state} entryCwd={server.cwd} />
+          : !testBlock && <span className="mcp-config-line is-dim">{t("mcp.test.never")}</span>}
+        {/* After the status lines: what to expect or do about what they report. */}
+        {stateDetail && <span className="mcp-config-line">{t(stateDetail)}</span>}
+        {test?.queueTimedOut && <span role="alert" className="mcp-config-line is-error">{t("mcp.test.queueTimedOut")}</span>}
+        {test?.error && (
+          <span role="alert" className="mcp-config-line is-error">
+            {t("mcp.test.requestFailed")} {testFailureText(test.error, t)}
+          </span>
+        )}
+        {testBlock && !blockSaidBy && (
+          <span id={testBlockId} className="mcp-config-line is-dim">{t(MCP_TEST_BLOCK_KEYS[testBlock])}</span>
+        )}
+        {/* Its own line, so no locale has to join two sentences with a space. */}
+        {!testBlock && server.commandFields.length > 0 && <span className="mcp-config-line is-dim">{t(MCP_TEST_SERIAL_KEY)}</span>}
+      </span>
+    </ConfigDetailGridRow>
   );
 }
 

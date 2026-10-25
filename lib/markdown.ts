@@ -1,29 +1,99 @@
 import type { Content, Link, Parent, Root } from "mdast";
+import type { Element as HastElement, Root as HastRoot, RootContent as HastContent } from "hast";
 import { defaultUrlTransform, type Options as ReactMarkdownOptions } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
+import remarkCjkFriendly from "remark-cjk-friendly/parseOnly";
 import remarkMath from "remark-math";
 import type { Plugin } from "unified";
 import type { Extension } from "micromark-util-types";
 
+// Link schemes of desktop apps that open a note, a file or a meeting (#1108).
+// A fixed list, not "any scheme but javascript:": the text comes from the model
+// and from repository files, and OS handlers such as ms-msdt: or search-ms:
+// have been exploited through a clicked link.
+const appLinkSchemes = [
+  "obsidian", "logseq", "notion",
+  "vscode", "vscode-insiders", "cursor", "zed", "jetbrains",
+  "zoommtg", "zoomus", "msteams", "slack",
+];
+const appLinkPattern = new RegExp(`^(?:${appLinkSchemes.join("|")}):`, "i");
+
+// The anti-clobber prefix the sanitizer puts in front of every `id` in
+// rendered content, so untrusted Markdown cannot shadow the page's own
+// elements. The fragment-link fix below must use the identical value, so the
+// schema that produces the prefixed ids pins the same constant.
+const markdownClobberPrefix = defaultSchema.clobberPrefix ?? "user-content-";
+
 const markdownSanitizeSchema = {
   ...defaultSchema,
+  clobberPrefix: markdownClobberPrefix,
   attributes: {
     ...defaultSchema.attributes,
     code: [["className", /^language-./, "math-inline", "math-display"]],
   },
   protocols: {
     ...defaultSchema.protocols,
-    href: [...(defaultSchema.protocols?.href ?? []), "file"],
+    href: [...(defaultSchema.protocols?.href ?? []), "file", ...appLinkSchemes],
   },
   strip: [...(defaultSchema.strip || []), "iframe", "object", "style", "form"],
 };
 
+/** react-markdown's URL filter, plus links to the apps above. */
+export function markdownAppUrlTransform(value: string): string {
+  return appLinkPattern.test(value) ? value : defaultUrlTransform(value);
+}
+
+/** Also keeps `file:` links, for renderers that open local files in the app. */
 export function markdownUrlTransform(value: string): string {
-  return /^file:/i.test(value) ? value : defaultUrlTransform(value);
+  return /^file:/i.test(value) ? value : markdownAppUrlTransform(value);
+}
+
+/** A link that leaves the page: it names a scheme or another host. */
+export function isExternalMarkdownHref(href: string | undefined): boolean {
+  return Boolean(href && /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href));
+}
+
+interface MarkdownFragmentClick {
+  defaultPrevented: boolean;
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  currentTarget: Pick<Element, "getAttribute" | "closest">;
+  preventDefault(): void;
+}
+
+/**
+ * A click on a `#fragment` link in rendered Markdown: brings the element it
+ * names into view within the same rendered document (the closest
+ * `.markdown-body`), as the Skills reader does with its headings. The browser's
+ * own jump searches the whole page, where every chat message with a footnote
+ * has its own `user-content-user-content-fn-1` and the file preview sits beside
+ * the chat, so it could land in another message; it would also put the
+ * fragment in the app's URL as a history entry. Modified clicks stay the
+ * browser's.
+ */
+export function jumpToMarkdownFragment(event: MarkdownFragmentClick): void {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const href = event.currentTarget.getAttribute("href");
+  if (!href?.startsWith("#")) return;
+  event.preventDefault();
+  let id = href.slice(1);
+  if (!id) return;
+  try {
+    id = decodeURIComponent(id);
+  } catch {
+    // A malformed escape is matched as written.
+  }
+  const name = CSS.escape(id);
+  event.currentTarget.closest(".markdown-body")
+    ?.querySelector(`[id="${name}"], a[name="${name}"]`)
+    ?.scrollIntoView({ block: "start" });
 }
 
 /**
@@ -508,6 +578,7 @@ const remarkCurrencySafeMath: Plugin = function () {
 export const markdownRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
   [remarkFrontmatter, ["yaml"]],
   [remarkGfm, remarkGfmOptions],
+  remarkCjkFriendly,
   remarkSplitAutolinkLiterals,
   remarkCurrencySafeMath,
 ];
@@ -573,18 +644,97 @@ export const markdownUserRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = 
 export const markdownPreviewRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
   [remarkFrontmatter, ["yaml"]],
   [remarkGfm, remarkGfmOptions],
+  remarkCjkFriendly,
   remarkSplitAutolinkLiterals,
   remarkCurrencySafeMath,
 ];
 
+interface SanitizedNode {
+  type?: string;
+  properties?: Record<string, unknown>;
+  children?: SanitizedNode[];
+}
+
+/**
+ * GitHub rewrites both sides of a content anchor. cmark-gfm prefixes rendered
+ * `id`s with `user-content-` (anti-clobber) and rewrites same-document fragment
+ * links to match, so a hand-written pair like `<a id="toc"></a>` with
+ * `[ToC](#toc)` still lands after rendering. `rehype-sanitize` copies only the
+ * `id` half of that — `defaultSchema`'s `clobber` + `clobberPrefix` — which on
+ * its own breaks every in-document anchor pair: the element gains the prefix
+ * and the link pointing at it does not.
+ *
+ * This plugin runs after sanitizing and prefixes fragment links exactly as
+ * unconditionally as sanitizing prefixes ids, so an id and an href that matched
+ * before sanitizing still match afterwards. Footnote references need it for the
+ * same reason: `mdast-util-to-hast` generates both their sides already prefixed
+ * and sanitizing prefixes the id once more, so an unprefixed href would strand
+ * the footnote link behind the doubled prefix.
+ *
+ * Links to page elements keep being unreachable from Markdown — that is the
+ * clobber protection doing its job, not this plugin. A bare `#` has no fragment
+ * to pair and stays as written.
+ */
+function rehypeMatchClobberedIds(): (tree: unknown) => void {
+  return (tree: unknown): void => {
+    const visit = (node: SanitizedNode): void => {
+      if (!node || typeof node !== "object") return;
+      const href = node.properties?.href;
+      if (node.type === "element" && typeof href === "string" && href.startsWith("#") && href.length > 1) {
+        node.properties!.href = `#${markdownClobberPrefix}${href.slice(1)}`;
+      }
+      for (const child of node.children ?? []) visit(child);
+    };
+    visit(tree as SanitizedNode);
+  };
+}
+
 export const markdownRehypePlugins: ReactMarkdownOptions["rehypePlugins"] = [
   rehypeRaw,
   [rehypeSanitize, markdownSanitizeSchema],
+  rehypeMatchClobberedIds,
+  [rehypeKatex, { throwOnError: false, strict: false }],
+];
+
+function hastText(node: HastContent): string {
+  return node.type === "text" ? node.value : node.type === "element" ? node.children.map(hastText).join("") : "";
+}
+
+/** GitHub's heading slugs for `#fragment` links, as a data attribute: two rendered documents never share an id. */
+function markdownHeadingAnchors() {
+  return (tree: HastRoot) => {
+    const seen = new Map<string, number>();
+    const visit = (node: HastRoot | HastElement) => node.children.forEach((child) => {
+      if (child.type !== "element") return;
+      if (/^h[1-6]$/.test(child.tagName)) {
+        const base = hastText(child).toLowerCase().replace(/[^\p{L}\p{M}\p{N}_\- ]/gu, "").replace(/ /g, "-");
+        // As github-slugger numbers repeats: "a", "a", "a-1" become a, a-1, a-1-1.
+        let slug = base;
+        while (seen.has(slug)) {
+          seen.set(base, seen.get(base)! + 1);
+          slug = `${base}-${seen.get(base)}`;
+        }
+        seen.set(slug, 0);
+        child.properties.dataHeadingAnchor = slug;
+      }
+      visit(child);
+    });
+    visit(tree);
+  };
+}
+
+// A document whose `#fragment` links lead to its headings (Settings › Skills).
+// Anchors come before KaTeX, which writes each formula's text twice.
+export const markdownDocumentRehypePlugins: ReactMarkdownOptions["rehypePlugins"] = [
+  rehypeRaw,
+  [rehypeSanitize, markdownSanitizeSchema],
+  markdownHeadingAnchors,
   [rehypeKatex, { throwOnError: false, strict: false }],
 ];
 
 export const markdownPreviewRehypePlugins: ReactMarkdownOptions["rehypePlugins"] = [
   rehypeRaw,
   [rehypeSanitize, markdownSanitizeSchema],
+  rehypeMatchClobberedIds,
   [rehypeKatex, { throwOnError: false, strict: false }],
 ];

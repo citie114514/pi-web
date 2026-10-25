@@ -62,6 +62,18 @@ webpi
 
 `webpi` opens a browser once the server is ready. If it does not, open the URL it printed, by default [http://127.0.0.1:30141](http://127.0.0.1:30141). WebPi listens only on `127.0.0.1` by default. To remove the command later, run `npm uninstall -g webpi`.
 
+`webpi` also has subcommands for the server it started:
+
+```bash
+webpi version           # print the installed version
+webpi status            # list running servers
+webpi stop [--port N]   # stop a running server
+webpi open [--port N]   # open a running server in the browser
+webpi update [--check]  # update a global npm install
+```
+
+To update, run `webpi stop`, then `webpi update` (or run the same install command again).
+
 ### As a Pi package
 
 Install this directory as a Pi package to start the server from inside pi:
@@ -99,6 +111,7 @@ npm run desktop:dist     # installer + portable for this platform
 
 Artifacts land in `release/`. `.github/workflows/desktop-release.yml` builds every platform, starts each packaged artifact to verify that it boots, and publishes the release.
 
+
 ## Configuration
 
 For the port and hostname, command-line options override the corresponding environment variables. Either `--no-open` or `PI_WEB_NO_OPEN=1` disables automatic browser opening. Run `webpi --help` (or `-h`) to print the startup options and exit without starting the server; unknown options exit with an error.
@@ -111,11 +124,15 @@ Environment variables keep their upstream `PI_WEB_*` names so that existing inst
 | `--port <port>`, `-p <port>`, or `PORT` | Server port | `30141` |
 | `--hostname <host>`, `-H <host>`, or `PI_WEB_HOSTNAME` | Bind hostname | `127.0.0.1` |
 | `--no-open` or `PI_WEB_NO_OPEN=1` | Do not open a browser automatically | Browser opens |
+| `PI_WEB_APP_NAME` | PWA manifest `name` and `short_name`; surrounding whitespace is trimmed, empty values use the default | `WebPi` |
 | `PI_WEB_SKIP_VERSION_CHECK=1` | Disable WebPi update checks | Unset |
+
 | `PI_WEB_ALLOWED_HOSTS` | Additional exact proxy or custom hostnames, comma-separated | Unset |
 | `PI_WEB_PASSWORD` | Enable browser password login; API clients may use Basic Auth with username `pi` | Authentication disabled |
 | `PI_WEB_IDLE_TIMEOUT_MS` | Session idle timeout in milliseconds, up to `2147483647`; `0` disables idle shutdown; invalid or out-of-range values use the default | `600000` (10 min) |
 | `PI_WEB_SHUTDOWN_DEADLINE_MS` | How long extensions get to handle `session_shutdown` before a closing session is disposed anyway, in milliseconds up to `2147483647`; `0`, invalid or out-of-range values use the default | `5000` (5 s) |
+
+Set `PI_WEB_APP_NAME` before starting the server (for example, `PI_WEB_APP_NAME='Work Pi' pi-web`). After changing it, restart the server to serve the new manifest; no rebuild is required. Updates to the name of an already installed PWA are managed by the browser and are not guaranteed to appear immediately. This does not change the page title or icons.
 
 For example:
 
@@ -167,10 +184,11 @@ webpi
 
 - **Agent data**: WebPi reads pi data from `~/.pi/agent` by default, including session files under `sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`. Set `PI_CODING_AGENT_DIR` to use another pi agent directory.
 - **Filesystem access**: WebPi must be able to read the agent data directory and the working directories recorded by its sessions. Run it in the same filesystem environment as pi when sharing existing sessions.
-- **Shared configuration**: the Models panel uses pi's model, settings, and credential storage, so changes are visible to both interfaces.
+- **Shared configuration**: the Models panel uses pi's model, settings, and credential storage, so changes are visible to both interfaces. An open session applies a saved edit of its model when you select the model again.
 - **File access boundary**: the file browser is limited to working directories selected in WebPi and project or session roots it already knows about; it is not a general filesystem browser.
 - **Git worktrees**: see [Worktrees in WebPi](./docs/worktrees.md) for switcher visibility, worktree creation, and removal behavior.
 - **Building on WebPi**: wrappers and other downstream builds can hook into the session row context menu and register extension session liveness; see [Downstream integration](./docs/downstream-integration.md).
+
 
 ## Development
 
@@ -189,7 +207,10 @@ npm run lint
 
 Do not run `next build` or `npm run build` during normal development: it writes to `.next/` and can interfere with the development server. Leave builds for release work.
 
+Before starting on a feature, read [Contributing](./CONTRIBUTING.md) for what is in scope and the pull request checklist.
+
 Contributor guides: [Upstream sync](./docs/upstream-sync.md) (this fork tracks upstream weekly), [Internationalization](./docs/i18n.md), and [Release process](./docs/release.md).
+
 
 ## Repository Layout
 

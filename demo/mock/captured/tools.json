@@ -304,7 +304,7 @@
      "items": {
       "type": "string"
      },
-     "description": "UTF-8 text files under the session cwd to include with the task.",
+     "description": "UTF-8 text files under the session cwd to include with the task. Together they may fill about a tenth of the subagent model's context window, at most 512 KB. Pass fewer or smaller files, or name the paths in prompt if the subagent can read them.",
      "maxItems": 8
     },
     "description": {
@@ -317,23 +317,11 @@
     },
     "model": {
      "type": "string",
-     "description": "Optional provider/modelId override."
-    },
-    "thinking": {
-     "type": "string",
-     "description": "Optional thinking level override."
-    },
-    "max_turns": {
-     "type": "number",
-     "description": "Optional positive agent turn limit."
-    },
-    "inherit_context": {
-     "type": "boolean",
-     "description": "Include the parent session's active conversation context."
+     "description": "Optional provider/modelId override. Append \":<level>\" (off, minimal, low, medium, high, xhigh, max) to also set the thinking level for this run, e.g. \"provider/model:high\"."
     },
     "isolation": {
      "type": "string",
-     "description": "Run the subagent in an isolated git worktree."
+     "description": "Set to \"worktree\" to run the subagent in an isolated git worktree."
     }
    }
   },

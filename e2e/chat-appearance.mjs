@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { checkFontPreferences } from "./font-preferences.mjs";
 
 export async function checkChatAppearanceReset(page) {
   const width = page.getByRole("slider", { name: "Chat content width", exact: true });
-  const fontSize = page.getByRole("slider", { name: "Chat font size", exact: true });
+  const fontSize = page.getByRole("slider", { name: "Chat & terminal font size", exact: true });
   const resetWidth = page.getByRole("button", { name: "Reset chat content width", exact: true });
-  const resetFontSize = page.getByRole("button", { name: "Reset chat font size", exact: true });
+  const resetFontSize = page.getByRole("button", { name: "Reset chat & terminal font size", exact: true });
   await width.press("End");
   await fontSize.press("End");
   await resetWidth.click();
@@ -37,7 +38,7 @@ export async function checkChatAppearance(page) {
   const openSettings = () => page.getByRole("button", { name: "Settings", exact: true }).click();
   const closeSettings = () => page.keyboard.press("Escape");
   const width = page.getByRole("slider", { name: "Chat content width", exact: true });
-  const fontSize = page.getByRole("slider", { name: "Chat font size", exact: true });
+  const fontSize = page.getByRole("slider", { name: "Chat & terminal font size", exact: true });
   const font = (locator) => locator.evaluate((el) => getComputedStyle(el).fontSize);
   const fittedHeight = async () => {
     await page.waitForFunction(() => {
@@ -82,6 +83,7 @@ export async function checkChatAppearance(page) {
   assert.equal(await width.inputValue(), "2000");
   assert.equal(await fontSize.inputValue(), "18");
   await checkChatAppearanceReset(page);
+  await checkFontPreferences(page);
   for (const viewport of [{ width: 1280, height: 600 }, { width: 320, height: 568 }]) {
     await page.setViewportSize(viewport);
     await page.locator(".settings-general").evaluate((el) => { el.scrollTop = el.scrollHeight; });

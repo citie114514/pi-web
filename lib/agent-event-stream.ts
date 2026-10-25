@@ -1,9 +1,9 @@
 import {
+  AGENT_EVENT_HEARTBEAT_MS,
   isEventIncludedInSnapshot,
   toClientAgentEvent,
   type AgentEventLike,
 } from "./agent-event-wire";
-import { acquireSessionLivenessLease } from "./session-liveness";
 
 export interface AgentEventStreamSession {
   readonly isStreaming: boolean;
@@ -11,8 +11,6 @@ export interface AgentEventStreamSession {
   isAlive?(): boolean;
   onEvent(listener: (event: AgentEventLike) => void): () => void;
 }
-
-const HEARTBEAT_INTERVAL_MS = 30_000;
 
 /**
  * Backpressure for one SSE connection. The client is often a phone: when it
@@ -29,9 +27,9 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
  * this app never triggers (issue #923).
  *
  * The limit also has to absorb what a healthy client on a slow link has in
- * flight: one `read` of an image emits its base64 twice (the tool result's
- * `message_start` and `message_end`), and the second queues up while the first
- * one is still being written to the socket.
+ * flight: one `read` of an image emits its base64 in the tool result's
+ * `message_end` (its `message_start` goes as the role only), and that queues
+ * up while earlier events are still being written to the socket.
  */
 const STREAM_HIGH_WATER_MARK_BYTES = 512 * 1024;
 const DEFAULT_BACKLOG_LIMIT_BYTES = 16 * 1024 * 1024;
@@ -124,7 +122,6 @@ export function createAgentEventStream(
   sessionPromise: Promise<AgentEventStreamSession>,
 ): ReadableStream<Uint8Array> {
   let cancelStream: (closeController: boolean | "error") => void = () => {};
-  let releaseLease: () => void = () => {};
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -148,8 +145,6 @@ export function createAgentEventStream(
       const cleanup = (closeController: boolean | "error", reason?: Error) => {
         if (closed) return;
         closed = true;
-        releaseLease();
-        releaseLease = () => {};
         activeStreamClosers.delete(cleanup);
         if (heartbeat !== null) clearInterval(heartbeat);
         if (toolUpdateTimer !== null) clearTimeout(toolUpdateTimer);
@@ -164,7 +159,6 @@ export function createAgentEventStream(
         }
       };
       cancelStream = cleanup;
-      releaseLease = acquireSessionLivenessLease(sessionId).release;
       activeStreamClosers.add(cleanup);
 
       const backlogLimitBytes = resolveBacklogLimitBytes();
@@ -275,7 +269,7 @@ export function createAgentEventStream(
           });
           for (const event of bufferedEvents) forwardEvent(event, snapshot);
           if (snapshot !== undefined && snapshot !== null) {
-            encode({ type: "message_start", message: snapshot });
+            forwardEvent({ type: "message_start", message: snapshot }, undefined);
           }
           snapshotPublished = true;
         } catch (error) {
@@ -299,7 +293,7 @@ export function createAgentEventStream(
       }
       req.signal.addEventListener("abort", abortHandler, { once: true });
 
-      heartbeat = setInterval(() => enqueueText(":\n\n"), HEARTBEAT_INTERVAL_MS);
+      heartbeat = setInterval(() => encode({ type: "heartbeat" }, { droppable: true }), AGENT_EVENT_HEARTBEAT_MS);
 
       // Force the response headers through without claiming that the agent is
       // ready. The client waits for the later `connected` data event.
