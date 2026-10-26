@@ -25,7 +25,19 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
-      - run: npm test
+      - run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
+      # The job log needs authentication to read, so the failing test names are
+      # copied into the run summary where anyone can see them.
+      - if: always()
+        run: |
+          {
+            echo '## npm test'
+            echo '```'
+            grep -E '^(not ok|# (tests|pass|fail))' test-output.log | head -80 || echo 'no failures'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   e2e:
     runs-on: ubuntu-latest
