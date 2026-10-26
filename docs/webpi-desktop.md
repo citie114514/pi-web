@@ -55,6 +55,32 @@ serves the preferred port, the app starts its own instance on an OS-chosen free
 port so that quitting is always safe. An unexpected service exit opens a dialog
 offering 重启服务 or 退出.
 
+## Which pi runs
+
+The app ships `@earendil-works/pi-*` inside the package, but the machine usually
+has pi installed too — and the extensions under `~/.pi/agent/extensions` were
+written against that install, so they `require("@earendil-works/pi-tui")` and
+expect to find it. Resolved from the extension's own folder, that request fails.
+
+So `bin/pi-web.js` starts the server with `--require bin/prefer-local-pi.cjs`.
+The hook resolves every `@earendil-works/*` request against the local install
+first and falls back to the bundled copy:
+
+| Situation | What runs |
+| --- | --- |
+| `~/.pi/agent/install/current-version` points at a release | that release — the version `pi --version` reports |
+| `PI_MANAGED_INSTALL_ROOT` is set (a pi session started the app) | that install |
+| no local install, or the package is missing from it | the copy bundled in the app |
+
+`bin/local-pi.js` owns the lookup, so it is unit tested without Electron
+(`lib/local-pi.test.mjs`): a version file that is not a safe path segment is
+ignored, a package with an ESM-only `exports` map resolves through its own
+`exports`/`main` instead of being handed to the loader as a directory, and a
+missing local install leaves Node's normal resolution untouched.
+
+To see what a given launch picked, set `WEBPI_PI_HOOK_LOG=<file>` before
+starting the app; the hook appends one line per package it redirected.
+
 ## Packages
 
 | Platform | Installer | Portable |

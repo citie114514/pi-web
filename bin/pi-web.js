@@ -168,10 +168,21 @@ async function startServer({ port, hostname, openBrowser }) {
 
   // Always run next's JS entry with node directly — avoids .bin symlink issues
   // and path-with-spaces problems on Windows when shell: true is used.
+  // Prefer the machine's pi over the bundled copy for runtime `require`s (the
+  // extensions under ~/.pi/agent/extensions expect the local install).
+  // NODE_OPTIONS is parsed with its own quoting rules, and backslashes are
+  // escape characters there, so the hook path is written with forward slashes
+  // (Node accepts them on Windows) and quoted because the packaged app lives
+  // under "WebPi Desktop".
+  const preferLocalPiHook = path.join(__dirname, "prefer-local-pi.cjs").replaceAll("\\", "/");
+  const nodeOptions = [process.env.NODE_OPTIONS, `--require "${preferLocalPiHook}"`]
+    .filter(Boolean)
+    .join(" ");
+
   const child = spawn(process.execPath, getNextNodeArgs(nextBin, nextArgs), {
     cwd: pkgDir,
     stdio: ["inherit", "pipe", "inherit"],
-    env: { ...process.env, PI_WEB_HOSTNAME: hostname },
+    env: { ...process.env, PI_WEB_HOSTNAME: hostname, NODE_OPTIONS: nodeOptions },
   });
   wireChildProcessLifecycle(child);
 
