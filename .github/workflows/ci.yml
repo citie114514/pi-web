@@ -29,7 +29,7 @@ jobs:
           set -o pipefail
           npm test 2>&1 | tee test-output.log
       # The job log needs authentication to read, so the failing test names are
-      # copied into the run summary where anyone can see them.
+      # copied into the run summary and emitted as annotations.
       - if: always()
         run: |
           {
@@ -38,6 +38,8 @@ jobs:
             grep -E '^(not ok|# (tests|pass|fail))' test-output.log | head -80 || echo 'no failures'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - if: failure()
+        run: grep -E '^not ok' test-output.log | head -10 | sed 's/^/::error::/' || true
 
   e2e:
     runs-on: ubuntu-latest
