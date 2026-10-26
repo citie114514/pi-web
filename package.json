@@ -1,6 +1,6 @@
 {
   "name": "webpi",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "WebPi - out-of-the-box browser UI for the pi coding agent (downstream build of agegr/pi-web)",
   "homepage": "https://github.com/agegr/pi-web#readme",
   "repository": {
