@@ -36,6 +36,10 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    # A macOS runner outage ("The job was not acquired by Runner of type hosted")
+    # must not block the Windows and Linux release, so the macOS entry is
+    # optional; the release job below checks that the required platforms built.
+    continue-on-error: ${{ matrix.optional == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -60,6 +64,7 @@ jobs:
             args: --mac --x64 --arm64
             arch: ""
             unpacked: mac
+            optional: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -106,13 +111,23 @@ jobs:
   release:
     name: Publish release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    # !cancelled() keeps this job alive when only the optional macOS build
+    # failed; the first step then refuses to publish without Windows/Linux.
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
+      - name: Require the platforms that must ship
+        run: |
+          missing=0
+          ls artifacts/*.exe >/dev/null 2>&1 || { echo "::error::Windows installer is missing"; missing=1; }
+          ls artifacts/*.AppImage >/dev/null 2>&1 || { echo "::error::Linux AppImage is missing"; missing=1; }
+          ls artifacts/*.deb >/dev/null 2>&1 || { echo "::error::Linux deb is missing"; missing=1; }
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+          ls artifacts/*.dmg >/dev/null 2>&1 || echo "::warning::No macOS artifacts (the macOS runner was unavailable); publishing the rest"
       - name: Flatten the downloaded artifacts
         run: |
           cd artifacts
