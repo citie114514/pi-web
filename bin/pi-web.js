@@ -24,7 +24,7 @@ const { wireChildProcessLifecycle } = require("./process-lifecycle");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { rotatePreviewSecrets, getRotationWarning } = require("./rotate-preview-secrets");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { openInBrowser } = require("./browser-opener");
+const { openInBrowser, openWhenServing } = require("./browser-opener");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createRunRecordTracker, getOpenUrl, getRunDir } = require("./run-records");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -33,6 +33,8 @@ const { getPackageVersion, runCommand } = require("./pi-web-commands");
 // lib/port-selection.test.mjs.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { findFreePort, resolveStartPort, MAX_PORT_ATTEMPTS } = require("./port-selection");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { formatReachableAddresses } = require("./network-addresses");
 
 let launchOptions;
 try {
@@ -201,15 +203,23 @@ async function startServer({ port, hostname, openBrowser }) {
   });
 
   let serverReady = false;
+  // Next.js repeats the `-H` value in its own "Network:" line, which a wildcard
+  // bind makes unusable; name the interfaces and their addresses instead.
+  const reachable = formatReachableAddresses(hostname, resolved.port);
 
   child.stdout.on("data", (chunk) => {
     const text = chunk.toString();
     process.stdout.write(text);
     if (!serverReady && text.includes("Ready")) {
       serverReady = true;
+      if (reachable) process.stdout.write(`${reachable}\n`);
+      // The record needs no wait: status, stop and open list a record only
+      // once its URL answers. The browser waits for the first page.
       if (String(resolved.port) !== "0") runRecord.markReady();
+      // WebPi contract line: the desktop app and the /webpi extension wait for
+      // exactly this line (see desktop/launcher.js and lib/webpi-extension.test.mjs).
       console.log(`WebPi ready at ${url}`);
-      if (openBrowser) openInBrowser(url);
+      if (openBrowser) openWhenServing({ hostname, port: String(resolved.port), url });
     }
   });
 }

@@ -18,7 +18,6 @@ export const metadata: Metadata = {
   title: "WebPi",
   description: "WebPi - local browser interface for the pi coding agent",
   applicationName: "WebPi",
-  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       {
@@ -64,6 +63,7 @@ export default function RootLayout({
   return (
     <html lang="en" translate="no" className={`${notoSansMono.variable} notranslate`} suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <meta name="google" content="notranslate" />
         <script
           dangerouslySetInnerHTML={{

@@ -2,7 +2,7 @@
 
 import { useEffect, useImperativeHandle, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref, type RefObject, type UIEvent as ReactUIEvent } from "react";
 import type { SessionInfo } from "@/lib/types";
-import { listSessionFamilies, type SessionFamily } from "@/lib/session-family";
+import { listSessionFamilies, type SessionFamily, isHiddenRelation } from "@/lib/session-family";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { newSessionDeepLink, sessionDeepLink } from "@/lib/session-links";
 import { getProjectActivity, getRecentProjects } from "@/lib/project-groups";
@@ -53,7 +53,9 @@ import {
   projectRenameRequest,
   sessionMenuEntries,
   type SessionMenuActionId,
+  worktreeCreateFailure,
 } from "@/lib/sidebar-actions";
+import { shortenPath } from "@/lib/display-path";
 import { splitBeforeForkSuffix } from "@/lib/session-fork-name";
 import {
   mergeProjectChoices,
@@ -74,7 +76,9 @@ import {
   type ProjectMovePosition,
   type SessionUiStateRequest,
 } from "@/lib/session-ui-state-shared";
+import { countFaviconUnread, syncFaviconBadge } from "@/lib/favicon-badge";
 import { focusIfLost, type FocusDocument } from "@/lib/stacked-dialog";
+import { noteRunningPoll } from "@/lib/page-debug";
 import { useFilesPlacement } from "@/hooks/useFilesPlacement";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -228,6 +232,12 @@ interface Props {
   /** Fired when a session that is not currently selected finishes running.
    *  Lets the app play a cross-workspace completion tone. */
   onBackgroundTaskDone?: () => void;
+  /**
+   * Sessions that finished while the tab was hidden (#1484): usually the
+   * selected one, which `unreadSessionIds` excludes. Counted by the favicon
+   * until the tab is opened again; never persisted, never dotted.
+   */
+  hiddenFinishedSessionIds?: Set<string>;
   onRunningSessionIdsChange?: (ids: Set<string>) => void;
   onSessionsChange?: (sessions: SessionInfo[]) => void;
 }
@@ -500,7 +510,7 @@ function buttonAnchor(element: HTMLElement, align: "start" | "end"): SidebarMenu
   return { kind: "rect", rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }, align };
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, controlRef, onNewSessionContextChange, initialSessionId, initialSessionLinked, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, hiddenFinishedSessionIds, onRunningSessionIdsChange, onSessionsChange }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
@@ -545,8 +555,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [fileManagerError, setFileManagerError] = useState<string | null>(null);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [awaitingInputSessionIds, setAwaitingInputSessionIds] = useState<Set<string>>(() => new Set());
+  // Sessions whose subagents can still report back with a run there: not done yet (#1434).
+  const [subagentsActiveSessionIds, setSubagentsActiveSessionIds] = useState<Set<string>>(() => new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
+  const previousActiveSessionIdsRef = useRef<Set<string>>(new Set());
   const currentSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
   const previousSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
   // Once polling has delivered a snapshot it is the source of truth for
@@ -772,11 +785,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         setRunningSessionIds((previous) => sameIdsOr(previous, data.runningSessionIds ?? []));
         setAwaitingInputSessionIds((previous) => sameIdsOr(previous, data.awaitingInputSessionIds ?? []));
       }
-      // Drop markers for deleted sessions and for subagents, whose completion
-      // is intentionally silent even if an older client marked them unread.
+      // Drop markers for deleted sessions and for hidden family members
+      // (subagents, side chats), whose completion is intentionally silent
+      // even if an older client marked them unread.
       const unreadEligibleIds = new Set(
         data.sessions
-          .filter((session) => session.relation?.kind !== "subagent")
+          .filter((session) => !isHiddenRelation(session.relation))
           .map((session) => session.id),
       );
       setUnreadSessionIds((prev) => {
@@ -919,19 +933,29 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       const current = new AbortController();
       controller?.abort();
       controller = current;
+      // The debug panel's record of this poll (noteRunningPoll() in the finally): the request
+      // alone, up to its answer, without the session-list reload that may follow.
+      const startedAt = Date.now();
+      let answeredAt: number | null = null;
+      let outcome: "ok" | "error" | "aborted" = "error";
+      let httpStatus: number | null = null;
       try {
         const res = await fetch("/api/agent/running", {
           cache: "no-store",
           signal: current.signal,
         });
+        httpStatus = res.status;
         if (!res.ok) return;
+        outcome = "ok";
         const data = await res.json() as {
           sessionListVersion: number;
           runningSessionIds?: string[];
           awaitingInputSessionIds?: string[];
           completionNotificationSuppressedSessionIds?: string[];
+          subagentsActiveSessionIds?: string[];
           sessionUiStateRevision?: number | null;
         };
+        answeredAt = Date.now();
         if (stopped || controller !== current) return;
         runningPollAuthoritativeRef.current = true;
         currentSuppressedCompletionSessionIdsRef.current = new Set(
@@ -939,6 +963,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         );
         setRunningSessionIds((previous) => sameIdsOr(previous, data.runningSessionIds ?? []));
         setAwaitingInputSessionIds((previous) => sameIdsOr(previous, data.awaitingInputSessionIds ?? []));
+        setSubagentsActiveSessionIds((previous) => sameIdsOr(previous, data.subagentsActiveSessionIds ?? []));
         // Pins and archive changed in another window: reload them.
         noteUiRevision(data.sessionUiStateRevision);
         if (data.sessionListVersion !== sessionListVersionRef.current) {
@@ -947,9 +972,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         }
       } catch {
         // Keep the last known state; the next visible-tab poll retries.
+        outcome = current.signal.aborted ? "aborted" : "error";
       } finally {
         if (controller === current) controller = null;
         schedule();
+        // Assignments only, after the next poll is scheduled: it cannot change how polling goes on.
+        noteRunningPoll(startedAt, outcome, httpStatus, answeredAt);
       }
     };
 
@@ -981,15 +1009,33 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     onSessionsChange?.(allSessions);
   }, [allSessions, onSessionsChange]);
 
+  // The tab strip's favicon mirrors what the rows show (#1483): a persistent
+  // badge after the completion sound fades, cleared the same way the blue dot is.
+  // Sessions that finished while the tab was hidden count too (#1484): the rows
+  // exclude the selected session ("already looking"), which is false while hidden.
+  useEffect(() => {
+    syncFaviconBadge({
+      awaiting: awaitingInputSessionIds.size,
+      unread: countFaviconUnread(unreadSessionIds, hiddenFinishedSessionIds),
+    });
+  }, [awaitingInputSessionIds, unreadSessionIds, hiddenFinishedSessionIds]);
+
   useEffect(() => {
     const previous = previousRunningSessionIdsRef.current;
     const completedInBackground = [...previous].filter((id) => !runningSessionIds.has(id) && id !== selectedSessionId);
+    // A session is done once it neither runs nor waits for a subagent's report, which starts
+    // another run there: its first run's end is not the task's (#1434). Leaving that set is the
+    // completion, so a last run too short for any poll to see still counts.
+    const active = new Set([...runningSessionIds, ...subagentsActiveSessionIds]);
+    const finishedInBackground = [...previousActiveSessionIdsRef.current].filter((id) => !active.has(id) && id !== selectedSessionId);
+    // Subagent runs and side chats finish silently: a side chat is an aside
+    // the user drives, not a background task that owes a notification.
     const knownSubagentIds = new Set(
       allSessions
-        .filter((session) => session.relation?.kind === "subagent")
+        .filter((session) => isHiddenRelation(session.relation))
         .map((session) => session.id),
     );
-    const completedWithNotifications = completedInBackground.filter(
+    const completedWithNotifications = finishedInBackground.filter(
       (id) => !previousSuppressedCompletionSessionIdsRef.current.has(id) && !knownSubagentIds.has(id),
     );
     const newlyRunning = [...runningSessionIds].filter((id) => !previous.has(id));
@@ -1016,12 +1062,16 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
 
     previousRunningSessionIdsRef.current = runningSessionIds;
+    previousActiveSessionIdsRef.current = active;
+    const previousSuppressed = previousSuppressedCompletionSessionIdsRef.current;
     previousSuppressedCompletionSessionIdsRef.current = new Set(
-      [...runningSessionIds].filter(
-        (id) => currentSuppressedCompletionSessionIdsRef.current.has(id) || knownSubagentIds.has(id),
+      [...active].filter(
+        (id) => currentSuppressedCompletionSessionIdsRef.current.has(id) || knownSubagentIds.has(id)
+          // A subagent waiting for its own subagents is no longer listed as suppressed.
+          || (previousSuppressed.has(id) && !runningSessionIds.has(id)),
       ),
     );
-  }, [runningSessionIds, selectedSessionId, allSessions, loadSessions, onBackgroundTaskDone]);
+  }, [runningSessionIds, subagentsActiveSessionIds, selectedSessionId, allSessions, loadSessions, onBackgroundTaskDone]);
 
   useEffect(() => {
     if (!selectedSessionId) return;
@@ -1248,8 +1298,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cwd: project.root, branch }),
       });
-      const data = await res.json().catch(() => ({})) as { path?: string; error?: string };
-      if (!res.ok || data.error || !data.path) return { error: data.error ?? `HTTP ${res.status}` };
+      const data = await res.json().catch(() => ({})) as { path?: string; error?: string; code?: string; branch?: string; worktreePath?: string };
+      if (!res.ok || data.error || !data.path) {
+        const failure = worktreeCreateFailure(data, res.status);
+        return "key" in failure
+          ? { error: t(failure.key, { ...failure.params, path: shortenPath(failure.params.path) }) }
+          : failure;
+      }
       const path = data.path;
       setWorktreeState((prev) => (prev && prev.projectKey === project.key && !prev.worktrees.some((worktree) => worktree.path === path)
         ? { ...prev, worktrees: [...prev.worktrees, { path, branch, isMain: false }] }
@@ -1259,7 +1314,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) };
     }
-  }, []);
+  }, [t]);
 
   // The files tab's remove button. A checkout with changes answers "dirty",
   // and the picker asks before retrying with force.
@@ -2637,6 +2692,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     },
     onGroupNew: handleGroupNew,
     onGroupMenu: handleGroupMenu,
+    onPinEmptyGroup: (project: SidebarProject) => {
+      void applyUiState({ action: "pin-project", projectKey: project.key, root: project.root, pinned: true });
+      // The button goes with the pin: its group's header takes the focus.
+      focusAfterCommit(() => groupHeaderButton(project.key));
+    },
     onToggleArchiveGroup: handleToggleArchiveGroup,
     onArchiveGroupMenu: handleArchiveGroupMenu,
     onOpenOtherProject: handleOpenOtherProject,

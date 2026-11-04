@@ -20,7 +20,9 @@ import {
 } from "@/lib/file-types";
 import { encodeFilePathForApi, getFileDirectory, getFileName, getRelativeFilePath } from "@/lib/file-paths";
 import { fileVersion, fileVersionChanged } from "@/lib/file-version";
+import { injectSandboxedHtmlPolyfill } from "@/lib/html-sandbox-polyfill";
 import { HIDDEN_PAGE_GRACE_MS, usePageHiddenFor } from "@/hooks/usePageHidden";
+import { pageId, trackEventSource } from "@/lib/page-debug";
 import { parsePdfPageFragment, resolveLocalFileHref, shouldOpenLocalFileInApp } from "@/lib/file-links";
 import { parseFrontmatter } from "@/lib/frontmatter";
 import { isExternalMarkdownHref, jumpToMarkdownFragment, markdownAppUrlTransform, markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins, markdownUrlTransform, normalizeDisplayMath } from "@/lib/markdown";
@@ -33,6 +35,7 @@ import type { GitFileDiffResponse } from "@/lib/git-types";
 import { useI18n } from "@/hooks/useI18n";
 import {
   resolveInitialFileDisplayMode,
+  resolveInitialWrapLines,
   type FileViewerDisplayMode as DisplayMode,
   type FileViewerState,
 } from "@/lib/file-viewer-state";
@@ -62,6 +65,8 @@ interface FileData {
   size: number;
   nextOffset: number;
   truncated: boolean;
+  // A NUL in the first bytes (lib/text-preview.ts): no text view, only the download.
+  binary?: boolean;
 }
 
 const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
@@ -258,6 +263,8 @@ function getFileApiUrl(
   const encoded = encodeFilePathForApi(filePath);
   const searchParams = new URLSearchParams({ type });
   if (sourceSessionId) searchParams.set("sessionId", sourceSessionId);
+  // A watch is a stream: the page that holds it, for the Debug panel's connected pages.
+  if (type === "watch") searchParams.set("holder", pageId());
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) searchParams.set(key, String(value));
   }
@@ -301,7 +308,7 @@ function diffLines(patch: string): Array<DiffLine | DiffGap> {
   return files.flatMap(unifiedDiffLines);
 }
 
-function DiffView({ patch }: { patch: string }) {
+function DiffView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
   const { t } = useI18n();
   const diff = diffLines(patch);
 
@@ -358,7 +365,7 @@ function DiffView({ patch }: { patch: string }) {
     <div
       className="file-diff-view"
       style={{
-        width: "max-content",
+        width: wrapLines ? "100%" : "max-content",
         minWidth: "100%",
         ...FILE_CODE_STYLE,
       }}
@@ -429,9 +436,11 @@ function DiffView({ patch }: { patch: string }) {
               <span
                 className="file-diff-line-content"
                 style={{
-                  flexShrink: 0,
+                  flexShrink: wrapLines ? 1 : 0,
+                  minWidth: 0,
                   padding: "0 8px 0 0",
-                  whiteSpace: "pre",
+                  whiteSpace: wrapLines ? "pre-wrap" : "pre",
+                  overflowWrap: wrapLines ? "anywhere" : "normal",
                   color: "var(--text)",
                 }}
               >
@@ -503,7 +512,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         });
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = trackEventSource("file-watch", new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId)), filePath);
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -604,7 +613,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
               const img = e.currentTarget;
               setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
             }}
-            onError={() => setError("Failed to load image")}
+            onError={() => setError(t("files.imageLoadFailed"))}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
@@ -683,7 +692,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         });
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = trackEventSource("file-watch", new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId)), filePath);
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -778,7 +787,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
             preload="metadata"
             src={src}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-            onError={() => setError("Failed to load audio")}
+            onError={() => setError(t("files.audioLoadFailed"))}
             style={{ width: "100%" }}
           />
         </div>
@@ -844,7 +853,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
         });
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = trackEventSource("file-watch", new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId)), filePath);
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -941,7 +950,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
             preload="metadata"
             src={src}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-            onError={() => setError("Failed to load video")}
+            onError={() => setError(t("files.videoLoadFailed"))}
             style={{ maxWidth: "100%", maxHeight: "100%" }}
           />
         </div>
@@ -1037,7 +1046,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, initialPage, watchEnab
         });
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = trackEventSource("file-watch", new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId)), filePath);
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -1202,7 +1211,7 @@ function TextFileViewer({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestedInitialDisplayMode = resolveInitialFileDisplayMode(initialState, initialDisplayMode);
-  const initialWrapLines = initialState?.wrapLines ?? false;
+  const initialWrapLines = resolveInitialWrapLines(initialState, filePath);
   const initialScrollTop = initialState?.scrollTop ?? 0;
   const initialScrollLeft = initialState?.scrollLeft ?? 0;
   const [displayMode, setDisplayMode] = useState<DisplayMode>(requestedInitialDisplayMode);
@@ -1359,7 +1368,7 @@ function TextFileViewer({
       void fetchGitDiff(filePath);
     };
 
-    const es = new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId));
+    const es = trackEventSource("file-watch", new EventSource(getFileApiUrl(filePath, "watch", sourceSessionId)), filePath);
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -1404,7 +1413,8 @@ function TextFileViewer({
     void fetchGitDiff(filePath);
   }, [fetchGitDiff, filePath, gitRefreshKey]);
 
-  const isDelimitedTable = isDelimitedTablePath(filePath);
+  const isBinary = data?.binary === true;
+  const isDelimitedTable = !isBinary && isDelimitedTablePath(filePath);
 
   useEffect(() => {
     // HTML gets the same rendered-first treatment as markdown: a generated page
@@ -1415,6 +1425,7 @@ function TextFileViewer({
     if (
       defaultPreviewEligibleRef.current
       && data
+      && !data.binary
       && (
         isDelimitedTable
         || (data.language === "markdown" && !data.truncated)
@@ -1482,14 +1493,19 @@ function TextFileViewer({
   const language = data?.language ?? "text";
   // Plain text needs no Prism languages; any other file loads them once.
   const prismReady = usePrismLanguages(Boolean(data) && language !== "text");
-  const isHtml = language === "html";
-  const isMarkdown = language === "markdown";
+  const isHtml = !isBinary && language === "html";
+  const isMarkdown = !isBinary && language === "markdown";
   // A table shows a loaded prefix too, without its cut last record; an HTML
   // preview fetches the whole file up to HTML_PREVIEW_MAX_BYTES.
   const hasPreview = isDelimitedTable || (isHtml
     ? !!data && (!data.truncated || data.size <= HTML_PREVIEW_MAX_BYTES)
     : isMarkdown && !data?.truncated);
   const effectiveDisplayMode = isDeletedDiff ? "diff" : displayMode;
+  const rawHtml = data?.truncated ? htmlFull?.text : viewerContent;
+  const htmlPreview = useMemo(
+    () => isHtml && effectiveDisplayMode === "preview" ? injectSandboxedHtmlPolyfill(rawHtml ?? "") : "",
+    [isHtml, effectiveDisplayMode, rawHtml],
+  );
   // A partly loaded HTML file previews whole, so Load more belongs to its source view.
   const showLoadMore = !!data?.truncated && !(isHtml && effectiveDisplayMode === "preview");
   const useLightweightSource = sourceLines.length > SOURCE_HIGHLIGHT_MAX_LINES
@@ -1668,7 +1684,9 @@ function TextFileViewer({
       ];
   const metadata = isDeletedDiff
     ? t("files.deleted")
-    : `${language} · ${lines.length} lines · ${formatSize(data!.size)}`;
+    : isBinary
+      ? `${t("files.binary")} · ${formatSize(data!.size)}`
+      : `${language} · ${lines.length} lines · ${formatSize(data!.size)}`;
 
   return (
     <div className="file-viewer-shell" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", position: "relative" }}>
@@ -1755,7 +1773,7 @@ function TextFileViewer({
                 <MentionIcon />
               </button>
             )}
-            {effectiveDisplayMode === "source" && (
+            {(effectiveDisplayMode === "source" || effectiveDisplayMode === "diff") && !isBinary && (
               <>
                 <button
                   type="button"
@@ -1825,14 +1843,14 @@ function TextFileViewer({
         style={{ flex: 1, overflow: "auto", background: "var(--bg)", paddingBottom: showLoadMore ? 48 : undefined }}
       >
         {effectiveDisplayMode === "diff" && hasGitDiff ? (
-          <DiffView patch={gitDiff.patch!} />
+          <DiffView patch={gitDiff.patch!} wrapLines={wrapLines} />
         ) : isHtml && effectiveDisplayMode === "preview" && data?.truncated && !htmlFull?.text ? (
           <div style={{ padding: 24, color: "var(--text-dim)", fontSize: 12 }}>
             {htmlFull?.error ?? t("i18n.loading")}
           </div>
         ) : isHtml && effectiveDisplayMode === "preview" ? (
           <iframe
-            srcDoc={data?.truncated ? htmlFull?.text : content}
+            srcDoc={htmlPreview}
             sandbox="allow-scripts"
             style={{ width: "100%", height: "100%", border: "none", background: "var(--bg)" }}
              title={t("i18n.htmlPreview")}
@@ -1913,6 +1931,19 @@ function TextFileViewer({
             complete={!data?.truncated}
             scrollRef={contentRef}
           />
+        ) : isBinary ? (
+          // Decoded bytes are noise; opening a file never downloads it on its own (#1401).
+          <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, color: "var(--text-muted)", fontSize: 13, textAlign: "center" }}>
+            <span>{t("files.binaryNoPreview")}</span>
+            <a
+              href={getFileApiUrl(filePath, "download", sourceSessionId)}
+              download={getFileName(filePath)}
+              className="file-viewer-mode-button"
+              style={{ display: "inline-flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", textDecoration: "none" }}
+            >
+              {t("files.download")}
+            </a>
+          </div>
         ) : useLightweightSource ? (
           <div
             className="file-source-view is-lightweight"

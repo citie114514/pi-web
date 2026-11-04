@@ -575,12 +575,27 @@ const remarkCurrencySafeMath: Plugin = function () {
   }
 };
 
+// Drive letters otherwise look like unknown URL schemes to the sanitizer.
+// Rewrite only Markdown link destinations, before rehype and URL filtering.
+function remarkWindowsFileLinks() {
+  return (tree: Root): void => {
+    const walk = (node: Root | Content): void => {
+      if ((node.type === "link" || node.type === "definition") && /^\/?[A-Za-z]:\//.test(node.url)) {
+        node.url = `file:///${node.url.replace(/^\//, "")}`;
+      }
+      if ("children" in node) node.children.forEach(walk);
+    };
+    walk(tree);
+  };
+}
+
 export const markdownRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
   [remarkFrontmatter, ["yaml"]],
   [remarkGfm, remarkGfmOptions],
   remarkCjkFriendly,
   remarkSplitAutolinkLiterals,
   remarkCurrencySafeMath,
+  remarkWindowsFileLinks,
 ];
 
 // User messages keep every typed line break, as the TUI shows them (#680). The
@@ -591,35 +606,43 @@ export const markdownRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
 // remark-rehype turns into a bare <br> through `data.hName`, not an mdast
 // `break`: remark-rehype follows that <br> with a "\n" text node, which the
 // pre-wrap rule renders as a second break, so hard breaks are swapped too. Code,
-// inline code, math and raw HTML are other node types and keep their text.
+// inline code and math are other node types and keep their text.
 interface MarkdownTreeNode {
   type: string;
   value?: string;
   children?: MarkdownTreeNode[];
   data?: { hName?: string };
+  position?: { start: { line: number }; end: { line: number } };
 }
 
 const LINE_ENDING = /[ \t]*(?:\r\n|\r|\n)[ \t]*/;
-const PHRASING_BLOCK_TYPES = new Set(["paragraph", "heading", "tableCell"]);
-// Raw-text elements take everything up to their closing tag as text, and
-// rehype-raw leaves that state at the next element, so a <br> placed after an
-// unclosed `<textarea>` or `<script>` garbles or drops the rest of the block.
-const RAW_TEXT_OPEN_TAG = /^<(?:iframe|noembed|noframes|noscript|plaintext|script|style|textarea|title|xmp)(?=[\s/>]|$)/i;
-
-function opensRawTextElement(node: MarkdownTreeNode): boolean {
-  if (node.type === "html") return RAW_TEXT_OPEN_TAG.test(node.value ?? "");
-  return node.children?.some(opensRawTextElement) ?? false;
-}
+// Containers whose children are blocks: an HTML block there becomes a paragraph.
+const BLOCK_CONTAINER_TYPES = new Set(["root", "blockquote", "listItem", "footnoteDefinition"]);
 
 function lineBreakNode(): MarkdownTreeNode {
   return { type: "lineBreak", data: { hName: "br" } };
 }
 
+// pi's TUI prints a user message's HTML as the characters typed (pi-tui's
+// Markdown, `case "html"`), so a pasted `<TableOperator v-model="x" />` or
+// `<textarea>` reads as written instead of being parsed by rehype-raw and
+// stripped by the sanitizer (#1407). Runs before the line breaks are kept, so
+// a multi-line tag breaks like any text.
+function htmlAsText(parent: MarkdownTreeNode): void {
+  if (!parent.children) return;
+  const blockParent = BLOCK_CONTAINER_TYPES.has(parent.type);
+  parent.children = parent.children.map((node) => {
+    if (node.type !== "html") {
+      htmlAsText(node);
+      return node;
+    }
+    const text = { type: "text", value: node.value ?? "" };
+    return blockParent ? { type: "paragraph", children: [text] } : text;
+  });
+}
+
 function keepLineBreaks(parent: MarkdownTreeNode): void {
   if (!parent.children) return;
-  // Such a block keeps the default rendering: its paragraph newlines still
-  // show through the pre-wrap rule.
-  if (PHRASING_BLOCK_TYPES.has(parent.type) && opensRawTextElement(parent)) return;
   parent.children = parent.children.flatMap((node) => {
     if (node.type === "break") return [lineBreakNode()];
     if (node.type !== "text" || !node.value) {
@@ -633,13 +656,59 @@ function keepLineBreaks(parent: MarkdownTreeNode): void {
   });
 }
 
-function remarkKeepLineBreaks() {
-  return (tree: MarkdownTreeNode) => keepLineBreaks(tree);
+function remarkUserText() {
+  return (tree: MarkdownTreeNode) => {
+    htmlAsText(tree);
+    keepLineBreaks(tree);
+  };
+}
+
+// A custom message may be laid out for a terminal (a status box, aligned bars),
+// and pi's TUI keeps a paragraph's line indents. The parser drops them from the
+// text, so they come back from the source. Only a top-level paragraph: inside a
+// list or a quote the source line's whitespace is part of the container's.
+function restoreLineIndents(paragraph: MarkdownTreeNode, sourceLines: string[]): void {
+  if (!paragraph.position) return;
+  let lineIndex = paragraph.position.start.line - 1;
+  const indentNode = (): MarkdownTreeNode[] => {
+    const indent = /^[ \t]*/.exec(sourceLines[lineIndex] ?? "")?.[0];
+    return indent ? [{ type: "text", value: indent }] : [];
+  };
+  const firstLineIndent = indentNode();
+  const walk = (parent: MarkdownTreeNode) => {
+    parent.children = parent.children?.flatMap((node) => {
+      if (node.type === "lineBreak") {
+        lineIndex += 1;
+        return [node, ...indentNode()];
+      }
+      if (node.children) walk(node);
+      // A code span or image may cross lines without a line break node.
+      else if (node.position) lineIndex += node.position.end.line - node.position.start.line;
+      return [node];
+    });
+  };
+  walk(paragraph);
+  paragraph.children = [...firstLineIndent, ...(paragraph.children ?? [])];
+}
+
+function remarkTextLayout() {
+  return (tree: MarkdownTreeNode, file: { value: unknown }) => {
+    htmlAsText(tree);
+    keepLineBreaks(tree);
+    const sourceLines = String(file.value).split(/\r\n|\r|\n/);
+    for (const node of tree.children ?? []) {
+      if (node.type === "paragraph") restoreLineIndents(node, sourceLines);
+    }
+  };
 }
 
 export const markdownUserRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
   ...(markdownRemarkPlugins ?? []),
-  remarkKeepLineBreaks,
+  remarkUserText,
+];
+export const markdownTextLayoutRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
+  ...(markdownRemarkPlugins ?? []),
+  remarkTextLayout,
 ];
 export const markdownPreviewRemarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
   [remarkFrontmatter, ["yaml"]],
@@ -647,6 +716,7 @@ export const markdownPreviewRemarkPlugins: ReactMarkdownOptions["remarkPlugins"]
   remarkCjkFriendly,
   remarkSplitAutolinkLiterals,
   remarkCurrencySafeMath,
+  remarkWindowsFileLinks,
 ];
 
 interface SanitizedNode {
@@ -689,16 +759,48 @@ function rehypeMatchClobberedIds(): (tree: unknown) => void {
   };
 }
 
+function hastText(node: HastContent): string {
+  return node.type === "text" ? node.value : node.type === "element" ? node.children.map(hastText).join("") : "";
+}
+
+/**
+ * Display math (`$$…$$`, a ```math fence: `<pre><code class="language-math">`)
+ * goes into a `<div data-math-source>` holding its LaTeX, which MarkdownBody
+ * gives a Copy button (#1380). KaTeX then renders the formula inside the div;
+ * its glyphs are no source to copy. Runs after sanitizing, so the attribute is
+ * never one a user's own HTML could carry (the schema drops `data-*`), and
+ * inline math (no `<pre>`) stays as it is.
+ */
+function rehypeDisplayMathSource() {
+  return (tree: HastRoot): void => {
+    const visit = (parent: HastRoot | HastElement): void => {
+      parent.children = parent.children.map((child) => {
+        if (child.type !== "element") return child;
+        const code = child.tagName === "pre" && child.children.length === 1 ? child.children[0] : null;
+        const classes = code?.type === "element" && code.tagName === "code" ? code.properties.className : null;
+        if (Array.isArray(classes) && classes.includes("language-math")) {
+          return {
+            type: "element",
+            tagName: "div",
+            properties: { className: ["markdown-math-display"], dataMathSource: hastText(child).replace(/\n$/, "") },
+            children: [child],
+          };
+        }
+        visit(child);
+        return child;
+      });
+    };
+    visit(tree);
+  };
+}
+
 export const markdownRehypePlugins: ReactMarkdownOptions["rehypePlugins"] = [
   rehypeRaw,
   [rehypeSanitize, markdownSanitizeSchema],
   rehypeMatchClobberedIds,
+  rehypeDisplayMathSource,
   [rehypeKatex, { throwOnError: false, strict: false }],
 ];
-
-function hastText(node: HastContent): string {
-  return node.type === "text" ? node.value : node.type === "element" ? node.children.map(hastText).join("") : "";
-}
 
 /** GitHub's heading slugs for `#fragment` links, as a data attribute: two rendered documents never share an id. */
 function markdownHeadingAnchors() {
@@ -729,6 +831,7 @@ export const markdownDocumentRehypePlugins: ReactMarkdownOptions["rehypePlugins"
   rehypeRaw,
   [rehypeSanitize, markdownSanitizeSchema],
   markdownHeadingAnchors,
+  rehypeDisplayMathSource,
   [rehypeKatex, { throwOnError: false, strict: false }],
 ];
 
