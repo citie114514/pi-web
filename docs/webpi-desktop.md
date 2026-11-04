@@ -68,8 +68,9 @@ first and falls back to the bundled copy:
 
 | Situation | What runs |
 | --- | --- |
-| `~/.pi/agent/install/current-version` points at a release | that release — the version `pi --version` reports |
-| `PI_MANAGED_INSTALL_ROOT` is set (a pi session started the app) | that install |
+| `~/.pi/agent/install/current-version` points at a release that is the same or newer than the bundled copy | that release — the version `pi --version` reports |
+| the local release is **older** than the bundled copy | the bundled copy; preferring it would downgrade an app built against the newer one (`WEBPI_PREFER_LOCAL_PI=force` overrides) |
+| `PI_MANAGED_INSTALL_ROOT` is set (a pi session started the app) | that install, under the same version rule |
 | no local install, or the package is missing from it | the copy bundled in the app |
 
 `bin/local-pi.js` owns the lookup, so it is unit tested without Electron

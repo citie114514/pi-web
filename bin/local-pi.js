@@ -147,9 +147,29 @@ function packageEntry(nodeModules, request) {
   }
 }
 
+/**
+ * Compare two dotted versions. Negative when `a` is older, 0 when equal,
+ * positive when `a` is newer. A prerelease sorts before its release
+ * (1.5.0-beta.1 < 1.5.0), which is all the ordering this needs.
+ */
+function compareVersions(a, b) {
+  const split = (value) => String(value).trim().split("-")[0].split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const left = split(a);
+  const right = split(b);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  const preA = String(a).includes("-");
+  const preB = String(b).includes("-");
+  if (preA !== preB) return preA ? -1 : 1;
+  return 0;
+}
+
 module.exports = {
   PI_PACKAGE,
   PI_SCOPE,
+  compareVersions,
   defaultAgentDir,
   localPiInstallRoot,
   localPiNodeModules,

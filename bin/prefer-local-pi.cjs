@@ -13,14 +13,39 @@
 // failure leaves Node's own resolution untouched.
 
 const Module = require("node:module");
+const path = require("node:path");
 
-const { localPiNodeModules, piVersionAt, resolveFromLocal } = require("./local-pi.js");
+const { compareVersions, localPiNodeModules, piVersionAt, resolveFromLocal } = require("./local-pi.js");
 
-function install({ env = process.env, nodeModules, log = () => {} } = {}) {
+/** Version of the copy shipped inside the app, or null. */
+function bundledPiVersion(dir = __dirname) {
+  try {
+    return require(path.join(dir, "..", "node_modules", "@earendil-works", "pi-coding-agent", "package.json")).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function install({ env = process.env, nodeModules, bundledVersion, log = () => {} } = {}) {
   const local = nodeModules ?? localPiNodeModules({ env });
   if (!local) {
     log("pi: using the bundled copy (no local pi install found)");
     return { nodeModules: null, version: null };
+  }
+
+  // A local install older than the bundled one is not a preference, it is a
+  // downgrade: the app is built and tested against its own copy, so the newer
+  // of the two wins. WEBPI_PREFER_LOCAL_PI=force overrides that.
+  const localVersion = piVersionAt(local);
+  const bundled = bundledVersion ?? bundledPiVersion();
+  if (
+    bundled &&
+    localVersion &&
+    compareVersions(localVersion, bundled) < 0 &&
+    env.WEBPI_PREFER_LOCAL_PI?.trim() !== "force"
+  ) {
+    log(`pi: local ${localVersion} is older than the bundled ${bundled}; using the bundled copy`);
+    return { nodeModules: null, version: bundled };
   }
 
   const original = Module._resolveFilename;
@@ -38,7 +63,7 @@ function install({ env = process.env, nodeModules, log = () => {} } = {}) {
     return original.call(this, request, ...rest);
   };
 
-  const version = piVersionAt(local);
+  const version = localVersion;
   log(`pi: preferring the local install (${version ?? "unknown version"}) at ${local}`);
   return { nodeModules: local, version };
 }
@@ -49,10 +74,15 @@ module.exports = { install };
 if (require.main === module || !module.parent) {
   // Direct execution: report what would be preferred, without patching.
   const local = localPiNodeModules({ env: process.env });
+  const localVersion = piVersionAt(local);
+  const bundled = bundledPiVersion();
+  const older = local && bundled && localVersion && compareVersions(localVersion, bundled) < 0;
   process.stdout.write(
-    local
-      ? `pi: local install ${piVersionAt(local) ?? "unknown"} at ${local}\n`
-      : "pi: no local install; the bundled copy would be used\n",
+    !local
+      ? "pi: no local install; the bundled copy would be used\n"
+      : older
+        ? `pi: local install ${localVersion} is older than the bundled ${bundled}; the bundled copy would be used\n`
+        : `pi: local install ${localVersion ?? "unknown"} at ${local}\n`,
   );
 } else {
   const file = process.env.WEBPI_PI_HOOK_LOG?.trim();
