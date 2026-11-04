@@ -52,7 +52,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
+      - run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build-output.log
+      # Same reason as the checks job: the build error has to be readable
+      # without the authenticated job log.
+      - if: failure()
+        run: grep -E 'Failed to compile|Error:|error:|Type error|Module not found' build-output.log | head -10 | sed 's/^/::error::/' || true
       - run: npm run test:e2e
         env:
           E2E_SERVER_MODE: start
