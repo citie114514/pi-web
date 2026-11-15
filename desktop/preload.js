@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld("webpiDesktop", {
     });
   },
 
+  /**
+   * Tell the shell which language the UI is in, so the menu bar matches it.
+   * The page stores it in localStorage, which the main process cannot read.
+   */
+  setLocale: (locale) => {
+    if (typeof locale === "string") ipcRenderer.send("webpi:locale", locale);
+  },
+
   /** Zoom the shell applies, as a percentage: 50–300. */
   setZoom: (percent) => {
     if (typeof percent === "number" && Number.isFinite(percent)) ipcRenderer.send("webpi:zoom", percent);

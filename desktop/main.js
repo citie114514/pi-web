@@ -20,7 +20,7 @@ const { createSettingsStore, isPersistableWindowState, normalizeBounds } = requi
 const { ServerSupervisor } = require("./server-supervisor");
 const { externalTarget, isAppUrl } = require("./external-links");
 const { buildTrayMenuTemplate } = require("./tray-menu");
-const { buildMenuTemplate } = require("./app-menu");
+const { buildMenuTemplate, supportedMenuLocales } = require("./app-menu");
 const { buildDesktopNotification, notificationTarget, shouldNotifyOnDesktop } = require("./notifications");
 
 const PRODUCT = "WebPi Desktop";
@@ -58,6 +58,9 @@ let trayHintShown = false;
 const ZOOM_LEVELS = [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300];
 const DEFAULT_ZOOM = 100;
 let zoomPercent = DEFAULT_ZOOM;
+// The UI's language, reported by the page (it lives in localStorage). English
+// until the page says otherwise, which is also the menu's fallback.
+let menuLocale = "en";
 
 if (!app.requestSingleInstanceLock()) {
   // A second launch focuses the running app instead of starting a second server.
@@ -167,7 +170,9 @@ function createWindow() {
     backgroundColor: "#1a1a1a",
     title: PRODUCT,
     icon: assetPath("icon.png"),
-    autoHideMenuBar: true,
+    // A visible menu bar, always: a hidden one (the old autoHideMenuBar) left
+    // users with no way to discover the menu at all.
+    autoHideMenuBar: false,
     webPreferences: {
       // The page needs no Node, but it does need three named capabilities:
       // desktop notifications, zoom, and menu actions. desktop/preload.js is the
@@ -272,6 +277,7 @@ function createWindow() {
  */
 function applyApplicationMenu() {
   const template = buildMenuTemplate({
+    locale: menuLocale,
     isMac: process.platform === "darwin",
     windowVisible: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()),
     // F12 already opens the tools (see the key handler); the menu keeps the
@@ -462,6 +468,16 @@ function installIpc() {
 
   ipcMain.on("webpi:zoom", (_event, percent) => {
     if (typeof percent === "number" && Number.isFinite(percent)) setZoom(percent);
+  });
+
+  ipcMain.on("webpi:locale", (_event, locale) => {
+    if (typeof locale !== "string" || locale === menuLocale) return;
+    // Only a language the menu actually has: an unknown value would leave the
+    // menu in English while the UI shows something else.
+    if (!supportedMenuLocales().includes(locale)) return;
+    menuLocale = locale;
+    logLine(`menu language: ${locale}`);
+    applyApplicationMenu();
   });
 }
 

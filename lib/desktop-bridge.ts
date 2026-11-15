@@ -17,6 +17,7 @@ export interface WebPiDesktopBridge {
   platform?: string;
   notify?: (payload: DesktopNotificationRequest) => void;
   setZoom?: (percent: number) => void;
+  setLocale?: (locale: string) => void;
   onMenuAction?: (callback: (action: string) => void) => () => void;
 }
 
@@ -42,6 +43,23 @@ export function desktopNotify(request: DesktopNotificationRequest): boolean {
   if (!bridge?.notify || !request.title) return false;
   try {
     bridge.notify({ ...request, tag: request.tag ?? "" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Tell the shell which language the UI is in, so its menu bar matches.
+ *
+ * The page keeps the locale in localStorage; the main process cannot read that,
+ * so it has to be reported. Called whenever the locale changes.
+ */
+export function desktopSetLocale(locale: string): boolean {
+  const bridge = desktopBridge();
+  if (!bridge?.setLocale || !locale) return false;
+  try {
+    bridge.setLocale(locale);
     return true;
   } catch {
     return false;

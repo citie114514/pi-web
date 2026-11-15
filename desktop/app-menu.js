@@ -11,24 +11,141 @@
 // around it — window management, reload, zoom, the data directory, and the
 // things a user looks for when the page itself will not answer.
 
+// The menu speaks the same languages as the web UI (lib/i18n). The page tells
+// the shell which one is active (desktop/preload.js setLocale); this is the
+// shell's own copy of the few strings the menu needs, so a stale page cannot
+// leave the menu in a language the UI no longer shows.
+const LABELS = {
+  en: {
+    app: "WebPi Desktop",
+    file: "File",
+    edit: "Edit",
+    view: "View",
+    window: "Window",
+    help: "Help",
+    newSession: "New Session",
+    openDataDir: "Open Data Folder",
+    openLog: "Open Log File",
+    quit: "Quit",
+    undo: "Undo",
+    redo: "Redo",
+    cut: "Cut",
+    copy: "Copy",
+    paste: "Paste",
+    selectAll: "Select All",
+    reload: "Reload",
+    zoomIn: "Zoom In",
+    zoomOut: "Zoom Out",
+    zoomReset: "Actual Size",
+    zoomNow: (percent) => `Zoom: ${percent}%`,
+    fullScreen: "Toggle Full Screen",
+    devTools: "Developer Tools",
+    hideToTray: "Hide to Tray",
+    showWindow: "Show Window",
+    minimize: "Minimize",
+    close: "Close Window",
+    about: "About WebPi Desktop",
+    checkUpdates: "Check for Updates…",
+    homepage: "Project Homepage",
+  },
+  "zh-CN": {
+    app: "WebPi Desktop",
+    file: "文件",
+    edit: "编辑",
+    view: "视图",
+    window: "窗口",
+    help: "帮助",
+    newSession: "新建会话",
+    openDataDir: "打开数据目录",
+    openLog: "打开日志文件",
+    quit: "退出",
+    undo: "撤销",
+    redo: "重做",
+    cut: "剪切",
+    copy: "复制",
+    paste: "粘贴",
+    selectAll: "全选",
+    reload: "重新加载",
+    zoomIn: "放大",
+    zoomOut: "缩小",
+    zoomReset: "实际大小",
+    zoomNow: (percent) => `当前缩放：${percent}%`,
+    fullScreen: "全屏",
+    devTools: "开发者工具",
+    hideToTray: "隐藏到托盘",
+    showWindow: "显示窗口",
+    minimize: "最小化",
+    close: "关闭窗口",
+    about: "关于 WebPi Desktop",
+    checkUpdates: "检查更新…",
+    homepage: "项目主页",
+  },
+  "zh-TW": {
+    app: "WebPi Desktop",
+    file: "檔案",
+    edit: "編輯",
+    view: "檢視",
+    window: "視窗",
+    help: "說明",
+    newSession: "新增工作階段",
+    openDataDir: "開啟資料目錄",
+    openLog: "開啟記錄檔",
+    quit: "結束",
+    undo: "復原",
+    redo: "重做",
+    cut: "剪下",
+    copy: "複製",
+    paste: "貼上",
+    selectAll: "全選",
+    reload: "重新載入",
+    zoomIn: "放大",
+    zoomOut: "縮小",
+    zoomReset: "實際大小",
+    zoomNow: (percent) => `目前縮放：${percent}%`,
+    fullScreen: "全螢幕",
+    devTools: "開發人員工具",
+    hideToTray: "隱藏到系統匣",
+    showWindow: "顯示視窗",
+    minimize: "最小化",
+    close: "關閉視窗",
+    about: "關於 WebPi Desktop",
+    checkUpdates: "檢查更新…",
+    homepage: "專案首頁",
+  },
+};
+
+/** Labels for a locale, falling back to English for anything unknown. */
+function labelsFor(locale) {
+  return LABELS[locale] ?? LABELS.en;
+}
+
 /** Electron roles that need no click handler; the OS implements them. */
-const EDIT_ROLES = [
-  { label: "撤销", role: "undo" },
-  { label: "重做", role: "redo" },
-  { type: "separator" },
-  { label: "剪切", role: "cut" },
-  { label: "复制", role: "copy" },
-  { label: "粘贴", role: "paste" },
-  { label: "全选", role: "selectAll" },
-];
+function editRoles(t) {
+  return [
+    { label: t.undo, role: "undo" },
+    { label: t.redo, role: "redo" },
+    { type: "separator" },
+    { label: t.cut, role: "cut" },
+    { label: t.copy, role: "copy" },
+    { label: t.paste, role: "paste" },
+    { label: t.selectAll, role: "selectAll" },
+  ];
+}
+
+/** Every locale the menu can speak, for the page and for the tests. */
+function supportedMenuLocales() {
+  return Object.keys(LABELS);
+}
 
 /**
  * @param {object} options
+ * @param {string} options.locale         "en" | "zh-CN" | "zh-TW"; anything else falls back to English
  * @param {boolean} options.isMac          macOS puts the app menu first and Window last
  * @param {boolean} options.windowVisible  drives 显示/隐藏 tray wording
  * @param {boolean} options.devTools       show the developer-tools item
  */
 function buildMenuTemplate({
+  locale = "en",
   isMac = false,
   windowVisible = true,
   devTools = false,
@@ -50,77 +167,76 @@ function buildMenuTemplate({
   onOpenHomepage = () => {},
   onQuit = () => {},
 } = {}) {
+  const t = labelsFor(locale);
+
+  const aboutItem = { label: t.about, click: onAbout };
+  const updatesItem = { label: t.checkUpdates, click: onCheckUpdates };
+  const homepageItem = { label: t.homepage, click: onOpenHomepage };
+
   const appMenu = {
-    label: "WebPi Desktop",
+    label: t.app,
     submenu: [
-      { label: "关于 WebPi Desktop", click: onAbout },
-      { label: "检查更新…", click: onCheckUpdates },
+      aboutItem,
+      updatesItem,
       { type: "separator" },
-      { label: "项目主页", click: onOpenHomepage },
+      homepageItem,
       { type: "separator" },
-      { label: "退出 WebPi Desktop", accelerator: "Cmd+Q", click: onQuit },
+      { label: t.quit, accelerator: "Cmd+Q", click: onQuit },
     ],
   };
 
   const fileMenu = {
-    label: "文件",
+    label: t.file,
     submenu: [
-      { label: "新建会话", accelerator: "CmdOrCtrl+N", click: onNewSession },
+      { label: t.newSession, accelerator: "CmdOrCtrl+N", click: onNewSession },
       { type: "separator" },
-      { label: "打开数据目录", click: onOpenDataDir },
-      { label: "打开日志文件", click: onOpenLog },
+      { label: t.openDataDir, click: onOpenDataDir },
+      { label: t.openLog, click: onOpenLog },
       { type: "separator" },
       // macOS keeps Quit in the application menu, where users expect it.
-      ...(isMac
-        ? []
-        : [{ label: "退出", accelerator: "Ctrl+Q", click: onQuit }]),
+      ...(isMac ? [] : [{ label: t.quit, accelerator: "Ctrl+Q", click: onQuit }]),
     ],
   };
 
   const viewMenu = {
-    label: "视图",
+    label: t.view,
     submenu: [
-      { label: "重新加载", accelerator: "CmdOrCtrl+R", click: onReload },
+      { label: t.reload, accelerator: "CmdOrCtrl+R", click: onReload },
       { type: "separator" },
-      { label: "放大", accelerator: "CmdOrCtrl+Plus", click: onZoomIn },
-      { label: "缩小", accelerator: "CmdOrCtrl+-", click: onZoomOut },
-      { label: "实际大小", accelerator: "CmdOrCtrl+0", click: onZoomReset },
+      { label: t.zoomIn, accelerator: "CmdOrCtrl+Plus", click: onZoomIn },
+      { label: t.zoomOut, accelerator: "CmdOrCtrl+-", click: onZoomOut },
+      { label: t.zoomReset, accelerator: "CmdOrCtrl+0", click: onZoomReset },
       // A label the user can read at a glance; getZoomPercent runs when the
       // menu is built, which happens on open (see main.js).
-      { label: `当前缩放：${getZoomPercent()}%`, enabled: false },
+      { label: t.zoomNow(getZoomPercent()), enabled: false },
       { type: "separator" },
-      { label: "全屏", accelerator: isMac ? "Ctrl+Cmd+F" : "F11", click: onToggleFullScreen },
-      ...(devTools ? [{ label: "开发者工具", accelerator: "F12", click: onToggleDevTools }] : []),
+      { label: t.fullScreen, accelerator: isMac ? "Ctrl+Cmd+F" : "F11", click: onToggleFullScreen },
+      ...(devTools ? [{ label: t.devTools, accelerator: "F12", click: onToggleDevTools }] : []),
       { type: "separator" },
       {
-        label: windowVisible ? "隐藏到托盘" : "显示窗口",
+        label: windowVisible ? t.hideToTray : t.showWindow,
         click: onToggleTrayItem,
       },
     ],
   };
 
   const windowMenu = {
-    label: "窗口",
+    label: t.window,
     submenu: [
-      { label: "最小化", accelerator: "CmdOrCtrl+M", click: onMinimize },
-      { label: "关闭窗口", accelerator: "CmdOrCtrl+W", click: onClose },
+      { label: t.minimize, accelerator: "CmdOrCtrl+M", click: onMinimize },
+      { label: t.close, accelerator: "CmdOrCtrl+W", click: onClose },
     ],
   };
 
   const helpMenu = {
-    label: "帮助",
-    submenu: [
-      { label: "关于 WebPi Desktop", click: onAbout },
-      { label: "检查更新…", click: onCheckUpdates },
-      { type: "separator" },
-      { label: "项目主页", click: onOpenHomepage },
-    ],
+    label: t.help,
+    submenu: [aboutItem, updatesItem, { type: "separator" }, homepageItem],
   };
 
   return [
     ...(isMac ? [appMenu] : []),
     fileMenu,
-    { label: "编辑", submenu: EDIT_ROLES },
+    { label: t.edit, submenu: editRoles(t) },
     viewMenu,
     // macOS puts its own Window menu at the end; adding ours would duplicate it.
     ...(isMac ? [] : [windowMenu]),
@@ -128,4 +244,4 @@ function buildMenuTemplate({
   ];
 }
 
-module.exports = { EDIT_ROLES, buildMenuTemplate };
+module.exports = { LABELS, buildMenuTemplate, editRoles, labelsFor, supportedMenuLocales };

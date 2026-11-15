@@ -38,7 +38,7 @@ import {
   shouldShowBrowserNotification,
   showBrowserNotification,
 } from "@/lib/browser-notifications";
-import { desktopBridge, desktopNotify } from "@/lib/desktop-bridge";
+import { desktopBridge, desktopNotify, desktopSetLocale } from "@/lib/desktop-bridge";
 import { setupPushSubscription } from "@/lib/push-client";
 import { startPageVisibilityTracking } from "@/lib/page-debug";
 import type { DebugClientSession } from "@/lib/debug-types";
@@ -1080,6 +1080,13 @@ export function AppShell() {
     onNewSession: (cwd: string) => handleNewSession(`kb-${Date.now()}`, cwd),
     activeCwd,
   });
+
+  // The desktop menu bar speaks the UI's language. The page owns the locale
+  // (localStorage), so it has to tell the shell; this also covers a change made
+  // in Settings → General → Language.
+  useEffect(() => {
+    desktopSetLocale(locale);
+  }, [locale]);
 
   // The desktop menu's 文件 → 新建会话 asks the page to do what Ctrl+Alt+N does,
   // so the menu and the keyboard shortcut cannot drift apart.
