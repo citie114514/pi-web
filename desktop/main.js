@@ -20,6 +20,8 @@ const { createSettingsStore, isPersistableWindowState, normalizeBounds } = requi
 const { ServerSupervisor } = require("./server-supervisor");
 const { externalTarget, isAppUrl } = require("./external-links");
 const { buildTrayMenuTemplate } = require("./tray-menu");
+const { buildMenuTemplate } = require("./app-menu");
+const { buildDesktopNotification, notificationTarget, shouldNotifyOnDesktop } = require("./notifications");
 
 const PRODUCT = "WebPi Desktop";
 const ASSETS_DIR = path.join(__dirname, "assets");
@@ -52,6 +54,10 @@ let appUrl;
 let quitting = false;
 let stopping = false;
 let trayHintShown = false;
+// Zoom the View menu and the page both drive, as a percentage.
+const ZOOM_LEVELS = [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300];
+const DEFAULT_ZOOM = 100;
+let zoomPercent = DEFAULT_ZOOM;
 
 if (!app.requestSingleInstanceLock()) {
   // A second launch focuses the running app instead of starting a second server.
@@ -73,6 +79,7 @@ async function bootstrap() {
 
   createWindow();
   createTray();
+  installIpc();
 
   try {
     const { url, owned } = await supervisor.start();
@@ -130,8 +137,14 @@ async function loadUI(url) {
     const popupDenied = await mainWindow.webContents
       .executeJavaScript(`window.open(${JSON.stringify(popupUrl)}) === null`)
       .catch(() => false);
+    // The shell's own surfaces: a menu bar that exists, and a page bridge the
+    // desktop window can actually reach (it is what routes notifications).
+    const menuLabels = Menu.getApplicationMenu()?.items.map((item) => item.label).join(",") ?? "";
+    const bridgeReady = await mainWindow.webContents
+      .executeJavaScript("Boolean(window.webpiDesktop && window.webpiDesktop.isDesktop)")
+      .catch(() => false);
     logLine(
-      `[smoke] url=${url} owned=${supervisor.owned} title=${title} window=${mainWindow.getTitle()} popupDenied=${popupDenied} body=${body}`
+      `[smoke] url=${url} owned=${supervisor.owned} title=${title} window=${mainWindow.getTitle()} popupDenied=${popupDenied} menu=${menuLabels} bridge=${bridgeReady} body=${body}`
     );
     if (SMOKE_SCREENSHOT) {
       const image = await mainWindow.webContents.capturePage();
@@ -156,6 +169,10 @@ function createWindow() {
     icon: assetPath("icon.png"),
     autoHideMenuBar: true,
     webPreferences: {
+      // The page needs no Node, but it does need three named capabilities:
+      // desktop notifications, zoom, and menu actions. desktop/preload.js is the
+      // only thing exposed to it.
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -163,7 +180,9 @@ function createWindow() {
     },
   });
 
-  Menu.setApplicationMenu(null);
+  // A real menu bar: 文件 / 编辑 / 视图 / 窗口 / 帮助. Rebuilt on open so the
+  // zoom readout and the tray wording are current.
+  applyApplicationMenu();
 
   // Mouse side buttons arrive as browser-backward / browser-forward. This is not
   // a browser: ignore them so they cannot walk the window history at all.
@@ -187,6 +206,12 @@ function createWindow() {
     openExternal(url);
   });
 
+  // Restore the zoom the View menu last set. The factor belongs to the
+  // webContents, so it is applied once the page exists.
+  const savedZoom = Number(settings?.get("zoomPercent", DEFAULT_ZOOM));
+  zoomPercent = Number.isFinite(savedZoom) ? Math.min(300, Math.max(50, Math.round(savedZoom))) : DEFAULT_ZOOM;
+  if (zoomPercent !== DEFAULT_ZOOM) mainWindow.webContents.setZoomFactor(zoomPercent / 100);
+
   mainWindow.once("ready-to-show", () => mainWindow.show());
   // The page sets its own title (the WebPi web UI, plus the active session), so
   // the window would otherwise read "WebPi". Keep the session context but name
@@ -205,16 +230,239 @@ function createWindow() {
     mainWindow = undefined;
     updateTrayMenu();
   });
-  mainWindow.on("show", updateTrayMenu);
-  mainWindow.on("hide", updateTrayMenu);
+  mainWindow.on("show", () => {
+    updateTrayMenu();
+    applyApplicationMenu();
+  });
+  mainWindow.on("hide", () => {
+    updateTrayMenu();
+    applyApplicationMenu();
+  });
   mainWindow.webContents.on("before-input-event", (event, input) => {
-    if (input.type === "keyDown" && input.key === "F12") {
+    if (input.type !== "keyDown") return;
+    if (input.key === "F12") {
       mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+      return;
+    }
+    // The menu's zoom accelerators only fire while the menu is showing; a
+    // hidden menu bar (autoHideMenuBar) still needs the shortcuts to work.
+    const modifier = process.platform === "darwin" ? input.meta : input.control;
+    if (!modifier || input.alt) return;
+    if (input.key === "+" || input.key === "=") {
+      stepZoom(+1);
+      event.preventDefault();
+    } else if (input.key === "-") {
+      stepZoom(-1);
+      event.preventDefault();
+    } else if (input.key === "0") {
+      setZoom(DEFAULT_ZOOM);
       event.preventDefault();
     }
   });
 
   void mainWindow.loadFile(path.join(__dirname, "splash.html"));
+}
+
+/**
+ * Build and install the menu bar.
+ *
+ * Called at window creation and again whenever the zoom readout or the
+ * window's visibility would change what the menu says.
+ */
+function applyApplicationMenu() {
+  const template = buildMenuTemplate({
+    isMac: process.platform === "darwin",
+    windowVisible: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()),
+    // F12 already opens the tools (see the key handler); the menu keeps the
+    // same shortcut so it is discoverable.
+    devTools: true,
+    getZoomPercent: () => zoomPercent,
+    onNewSession: () => sendMenuAction("new-session"),
+    onOpenDataDir: () => shell.openPath(app.getPath("userData")),
+    onOpenLog: () => openLogFile(),
+    onReload: () => reloadWindow(),
+    onZoomIn: () => stepZoom(+1),
+    onZoomOut: () => stepZoom(-1),
+    onZoomReset: () => setZoom(DEFAULT_ZOOM),
+    onToggleFullScreen: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    },
+    onToggleDevTools: () => mainWindow?.webContents.toggleDevTools(),
+    onToggleTrayItem: () => toggleWindow(),
+    onMinimize: () => mainWindow?.minimize(),
+    onClose: () => mainWindow?.close(),
+    onAbout: () => showAbout(),
+    onCheckUpdates: () => checkUpdates(),
+    onOpenHomepage: () => openExternal("https://github.com/citie114514/pi-web"),
+    onQuit: () => quitApp(),
+  });
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+/** Ask the page to act, e.g. start a new session from the 文件 menu. */
+function sendMenuAction(action) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("webpi:menu-action", action);
+  showWindow();
+}
+
+function reloadWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.reload();
+}
+
+/** Move to the next zoom step in `direction`, and keep the menu's readout in step. */
+function stepZoom(direction) {
+  const index = ZOOM_LEVELS.findIndex((level) => level >= zoomPercent);
+  const current = index === -1 ? ZOOM_LEVELS.length - 1 : index;
+  const next = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, current + direction));
+  setZoom(ZOOM_LEVELS[next]);
+}
+
+/**
+ * Apply a zoom percentage to the page and remember it.
+ *
+ * Chromium's zoom factor is a ratio; the menu and the page both speak percent.
+ * The value is clamped so a bad value from the page cannot make the UI unusable.
+ */
+function setZoom(percent) {
+  const next = Math.round(Math.min(300, Math.max(50, Number(percent) || DEFAULT_ZOOM)));
+  if (next === zoomPercent && mainWindow?.webContents.getZoomFactor() === next / 100) return;
+  zoomPercent = next;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.setZoomFactor(next / 100);
+  settings?.set("zoomPercent", next);
+  applyApplicationMenu();
+}
+
+function openLogFile() {
+  const file = path.join(app.getPath("userData"), "desktop.log");
+  // openPath opens the file in the user's editor of choice; if there is none,
+  // reveal the folder instead of failing silently.
+  void shell.openPath(file).then((error) => {
+    if (error) shell.showItemInFolder(file);
+  });
+}
+
+function showAbout() {
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  void dialog.showMessageBox(parent, {
+    type: "info",
+    title: `关于 ${PRODUCT}`,
+    message: `${PRODUCT} ${app.getVersion()}`,
+    detail: [
+      "pi 的浏览器界面 WebPi 的桌面客户端。",
+      "",
+      `版本：${app.getVersion()}`,
+      `Electron：${process.versions.electron}`,
+      `Node：${process.versions.node}`,
+      `数据目录：${app.getPath("userData")}`,
+    ].join("\n"),
+    buttons: ["好"],
+    defaultId: 0,
+  });
+}
+
+/**
+ * Check the release feed for a newer version.
+ *
+ * The page has an update endpoint of its own; this is the shell reaching the
+ * same releases page so the menu item works even when the UI is not loaded.
+ */
+async function checkUpdates() {
+  const current = app.getVersion();
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  try {
+    const response = await fetch("https://api.github.com/repos/citie114514/pi-web/releases?per_page=1", {
+      headers: { "User-Agent": `WebPi-Desktop/${current}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const releases = await response.json();
+    const latest = Array.isArray(releases) && releases[0]?.tag_name ? String(releases[0].tag_name) : "";
+    if (!latest) throw new Error("no release");
+    const newer = latest.replace(/^v/, "").startsWith(current) === false;
+    void dialog.showMessageBox(parent, {
+      type: "info",
+      title: "检查更新",
+      message: newer ? `发现新版本 ${latest}` : "已是最新版本",
+      detail: newer
+        ? `当前 ${current}，最新 ${latest}。\n下载：https://github.com/citie114514/pi-web/releases`
+        : `当前 ${current}。`,
+      buttons: newer ? ["打开下载页", "关闭"] : ["好"],
+      defaultId: 0,
+      cancelId: newer ? 1 : 0,
+    }).then(({ response: index }) => {
+      if (newer && index === 0) openExternal("https://github.com/citie114514/pi-web/releases");
+    });
+  } catch (error) {
+    void dialog.showMessageBox(parent, {
+      type: "warning",
+      title: "检查更新",
+      message: "无法检查更新",
+      detail: error instanceof Error ? error.message : String(error),
+      buttons: ["好"],
+    });
+  }
+}
+
+/**
+ * Show a desktop notification for an event the page reported.
+ *
+ * Clicking it brings the window forward and, when the payload names a session,
+ * opens that session. The URL is validated first (see notifications.js): a
+ * page-controlled string must not be able to navigate the window anywhere.
+ */
+function showPageNotification(payload) {
+  const event = buildDesktopNotification(payload);
+  if (!event) return;
+
+  const visible = Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
+  const focused = Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused());
+  if (!shouldNotifyOnDesktop({ windowVisible: visible, windowFocused: focused })) return;
+
+  const target = notificationTarget(event.sessionUrl, appUrl);
+
+  const click = () => {
+    showWindow();
+    if (!target || !mainWindow || mainWindow.isDestroyed()) return;
+    // Same-origin paths only, resolved against the served UI.
+    const url = new URL(target, appUrl).toString();
+    void mainWindow.loadURL(url).then(() => {
+      const history = mainWindow?.webContents.navigationHistory;
+      if (history && typeof history.clear === "function") history.clear();
+    });
+  };
+
+  if (process.platform === "win32" && tray?.displayBalloon) {
+    tray.displayBalloon({ title: event.title, content: event.body });
+    // displayBalloon has no click callback; the tray click already restores the
+    // window, so the session still opens through the page's own handlers.
+    return;
+  }
+  if (!Notification.isSupported()) return;
+  const notification = new Notification({ title: event.title, body: event.body, icon: assetPath("icon.png") });
+  notification.on("click", click);
+  notification.show();
+}
+
+/** Wire the page bridge. Every message is treated as untrusted input. */
+function installIpc() {
+  const { ipcMain } = require("electron");
+
+  ipcMain.on("webpi:notify", (_event, payload) => {
+    try {
+      showPageNotification(payload);
+    } catch (error) {
+      logLine(`[desktop] notification failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+
+  ipcMain.on("webpi:zoom", (_event, percent) => {
+    if (typeof percent === "number" && Number.isFinite(percent)) setZoom(percent);
+  });
 }
 
 function createTray() {

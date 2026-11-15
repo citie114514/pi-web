@@ -38,6 +38,7 @@ import {
   shouldShowBrowserNotification,
   showBrowserNotification,
 } from "@/lib/browser-notifications";
+import { desktopBridge, desktopNotify } from "@/lib/desktop-bridge";
 import { setupPushSubscription } from "@/lib/push-client";
 import { startPageVisibilityTracking } from "@/lib/page-debug";
 import type { DebugClientSession } from "@/lib/debug-types";
@@ -1080,6 +1081,16 @@ export function AppShell() {
     activeCwd,
   });
 
+  // The desktop menu's 文件 → 新建会话 asks the page to do what Ctrl+Alt+N does,
+  // so the menu and the keyboard shortcut cannot drift apart.
+  useEffect(() => {
+    const bridge = desktopBridge();
+    if (!bridge?.onMenuAction || !activeCwd) return;
+    return bridge.onMenuAction((action) => {
+      if (action === "new-session") handleNewSession(`menu-${Date.now()}`, activeCwd);
+    });
+  }, [activeCwd, handleNewSession]);
+
   // Client-built transient SessionInfo (new session / fork) lacks the
   // server-computed projectKey, which the same-project check in
   // handleCwdChange relies on. Hydrate it from the session list so switching
@@ -1122,10 +1133,16 @@ export function AppShell() {
     body: string;
     tag?: string;
   }) => {
+    const sessionUrl = targetSession ? `/?session=${encodeURIComponent(targetSession.id)}` : "/";
+
+    // The desktop shell shows its own system notification (Electron has no page
+    // notification permission, and a browser notification could not raise the
+    // window). lib/desktop-bridge.ts is a no-op in a browser tab.
+    if (desktopNotify({ title, body, sessionUrl, tag })) return;
+
     if (!("Notification" in window)) return;
 
     const fire = () => {
-      const sessionUrl = targetSession ? `/?session=${encodeURIComponent(targetSession.id)}` : "/";
       void showBrowserNotification({
         title,
         body,

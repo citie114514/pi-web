@@ -82,6 +82,47 @@ missing local install leaves Node's normal resolution untouched.
 To see what a given launch picked, set `WEBPI_PI_HOOK_LOG=<file>` before
 starting the app; the hook appends one line per package it redirected.
 
+## Menus and notifications
+
+The window has a menu bar — 文件 / 编辑 / 视图 / 窗口 / 帮助 — built in
+`desktop/app-menu.js` as a plain template so it can be asserted without an
+Electron runtime (`lib/desktop-menu.test.mjs`):
+
+| Menu | Items |
+| --- | --- |
+| 文件 | 新建会话（Ctrl+N）, 打开数据目录, 打开日志文件, 退出（macOS keeps Quit in the app menu） |
+| 编辑 | 撤销 / 重做 / 剪切 / 复制 / 粘贴 / 全选 — OS roles, so the system clipboard works |
+| 视图 | 重新加载, 放大 / 缩小 / 实际大小（Ctrl+±/0）, 全屏, 开发者工具, 隐藏到托盘 |
+| 窗口 | 最小化, 关闭窗口 |
+| 帮助 | 关于 WebPi Desktop, 检查更新…, 项目主页 |
+
+The menu bar auto-hides on Windows and Linux (`autoHideMenuBar: true`) — press
+Alt to show it — but the zoom and reload accelerators keep working, because
+`main.js` also handles them in `before-input-event` rather than relying on a
+menu that is not on screen.
+
+### Notifications
+
+The browser build notifies through `lib/browser-notifications.ts`. In the
+desktop window that path cannot work: an Electron page has no notification
+permission of its own, and a page notification cannot raise the window. So the
+same event goes to the shell instead:
+
+1. `components/AppShell.tsx` calls `desktopNotify()` (`lib/desktop-bridge.ts`)
+   with the title, body and session URL it would have shown in a tab.
+2. `desktop/preload.js` forwards it over IPC. The page never sees Node — only
+   `notify`, `setZoom` and `onMenuAction`.
+3. `desktop/notifications.js` decides whether to show it
+   (`shouldNotifyOnDesktop`: only while the window is hidden or unfocused),
+   builds the text (clipped, whitespace collapsed) and validates the click
+   target. **Only same-origin app paths are accepted** — a page-controlled
+   string must not be able to navigate the window anywhere else.
+4. Clicking it brings the window forward and opens that session.
+
+Windows uses the tray balloon; other platforms use `Notification`. The
+`desktop.log` line `[smoke] … menu=… bridge=…` in the packaged self-test proves
+both the menu bar and the bridge exist in a build.
+
 ## Packages
 
 | Platform | Installer | Portable |
