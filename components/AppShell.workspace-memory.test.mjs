@@ -30,6 +30,11 @@ test("a linked session that is gone gets no other session in its place (#1168)",
     await t.test(label, () => {
       const urls = [];
       const context = vm.createContext({
+        // The extracted slice may span hooks that are not this test's subject.
+        useEffect: () => {},
+        desktopBridge: () => null,
+        desktopSetLocale: () => false,
+        locale: "en",
         ...draftStore,
         crypto: globalThis.crypto,
         URLSearchParams,
@@ -39,6 +44,10 @@ test("a linked session that is gone gets no other session in its place (#1168)",
         clearLastOpen() {},
         workspaceKeyOf: (value) => value.projectKey ?? value.cwd,
         useCallback: (callback) => callback,
+        // The slice below may span a useEffect between the callbacks; effects
+        // are not what these tests exercise, so running them is not required.
+        useEffect: () => {},
+        desktopBridge: () => null,
         changeFileWorkspace() {},
         activeNewSessionDraftKeyRef: { current: null },
         activeProjectKeyRef: { current: null },
@@ -104,6 +113,11 @@ test("New restores the draft after session navigation and workspace auto-restore
       const session = { id: "remembered", cwd: rememberedCwd, projectKey: cwd };
       const response = Promise.withResolvers();
       const context = vm.createContext({
+        // The extracted slice may span hooks that are not this test's subject.
+        useEffect: () => {},
+        desktopBridge: () => null,
+        desktopSetLocale: () => false,
+        locale: "en",
         ...draftStore,
         crypto: globalThis.crypto,
         queueMicrotask,
@@ -215,6 +229,11 @@ test("New in another project adopts it up front and parks the composer's draft",
   ].join("\n");
   const fileTab = { id: "file:/p1/notes.md", filePath: "/p1/notes.md" };
   const context = vm.createContext({
+        // The extracted slice may span hooks that are not this test's subject.
+        useEffect: () => {},
+        desktopBridge: () => null,
+        desktopSetLocale: () => false,
+        locale: "en",
     ...draftStore,
     crypto: globalThis.crypto,
     URLSearchParams,
@@ -301,6 +320,11 @@ test("the composer's bar moves the fresh composer's draft and model picks instea
   const fileTab = { id: "file:/p1/notes.md", filePath: "/p1/notes.md" };
   const choices = { model: { provider: "custom", modelId: "fast" }, thinkingLevel: "high" };
   const context = vm.createContext({
+        // The extracted slice may span hooks that are not this test's subject.
+        useEffect: () => {},
+        desktopBridge: () => null,
+        desktopSetLocale: () => false,
+        locale: "en",
     ...draftStore,
     crypto: globalThis.crypto,
     URLSearchParams,
@@ -406,6 +430,11 @@ test("the bar of the new composer shows the bar's own move until the sidebar rep
   ].join("\n");
   const starts = [];
   const context = vm.createContext({
+        // The extracted slice may span hooks that are not this test's subject.
+        useEffect: () => {},
+        desktopBridge: () => null,
+        desktopSetLocale: () => false,
+        locale: "en",
     Error,
     useCallback: (callback) => callback,
     newSessionMoveRef: { current: null },
@@ -473,6 +502,11 @@ test("a new session puts the caret in the fresh composer on desktop only (#1313)
   const frames = [];
   const focused = [];
   const context = vm.createContext({
+        // The extracted slice may span hooks that are not this test's subject.
+        useEffect: () => {},
+        desktopBridge: () => null,
+        desktopSetLocale: () => false,
+        locale: "en",
     ...draftStore,
     crypto: globalThis.crypto,
     URLSearchParams,
