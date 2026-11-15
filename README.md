@@ -29,8 +29,8 @@ WebPi is a downstream build of [pi-web](https://github.com/agegr/pi-web): the ap
 - **Two ways to branch**: **New session** creates an independent session file from an earlier message; **Edit from here** creates a branch inside the current session.
 - **Project file tools**: browse and upload files, inspect Git diffs, and preview source, Markdown, images, audio, PDFs, and DOCX files with automatic refresh.
 - **Git worktrees**: switch checkouts from the sidebar while keeping sessions from the same repository grouped together.
-- **Web-based configuration**: manage provider login and API keys, models, model tests, plugin packages, and skills without leaving the browser.
-- **English, Simplified Chinese, and Traditional Chinese UI**: the interface follows the browser language initially and provides a language switcher in the top bar.
+- **Web-based configuration**: manage provider login and API keys, models, model tests, plugin packages, and skills without leaving WebPi.
+- **English, Simplified Chinese, and Traditional Chinese UI**: WebPi follows the browser language initially. Change it under Settings → General → Language.
 
 ## Quick Start
 
@@ -159,6 +159,8 @@ PI_WEB_PASSWORD='a-long-random-password' webpi --hostname 0.0.0.0
 
 Password authentication does not encrypt the connection. Do not expose WebPi over plain HTTP to the internet; use HTTPS through a trusted reverse proxy or a trusted VPN. If a reverse proxy sends an external hostname, add that exact name to `PI_WEB_ALLOWED_HOSTS`. This allow-list does not change the address WebPi binds to.
 
+With many chats, terminals or file previews active at once, plain HTTP limits the browser to six connections and requests start to wait; see [Serving Pi Web over HTTP/2](./docs/http2.md).
+
 ### Docker
 
 The upstream project publishes an image to `ghcr.io/agegr/pi-web`; this fork does
@@ -194,7 +196,7 @@ webpi
 - **Shared configuration**: the Models panel uses pi's model, settings, and credential storage, so changes are visible to both interfaces. An open session applies a saved edit of its model when you select the model again.
 - **File access boundary**: the file browser is limited to working directories selected in WebPi and project or session roots it already knows about; it is not a general filesystem browser.
 - **Git worktrees**: see [Worktrees in WebPi](./docs/worktrees.md) for switcher visibility, worktree creation, and removal behavior.
-- **Building on WebPi**: wrappers and other downstream builds can hook into the session row context menu and register extension session liveness; see [Downstream integration](./docs/downstream-integration.md).
+- **Integration hooks**: apps that embed WebPi can replace the session row's context menu, and server-side pi extensions can keep a session from idle shutdown; see [Integration Hooks](./docs/integrations.md).
 
 
 ## Development
@@ -235,7 +237,7 @@ docs/            Focused user and contributor guides
 demo/            Static browser demo published to GitHub Pages (see demo/README.md)
 ```
 
-See [AGENTS.md](./AGENTS.md) for the architecture notes and detailed file map.
+See [AGENTS.md](./AGENTS.md) for the architecture notes, API routes and topic notes.
 
 ## License
 

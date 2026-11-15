@@ -132,7 +132,7 @@ async function startServer({ port, hostname, openBrowser }) {
     process.exit(1);
   }
 
-  const url = `http://${hostname}:${resolved.port}`;
+  const url = getOpenUrl(hostname, resolved.port);
 
   if (resolved.alreadyRunning) {
     console.log(`WebPi is already running at ${url}`);
