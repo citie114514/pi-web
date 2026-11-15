@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lets the CI be started by hand, e.g. to re-check a branch after an outage
+  # instead of pushing an empty commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
