@@ -68,5 +68,3 @@ jobs:
           name: e2e-failure
           path: test-results/e2e/
           retention-days: 7
-
-# 触发探针：确认 push 是否会唤醒工作流（验证后移除）
