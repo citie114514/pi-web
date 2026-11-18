@@ -60,7 +60,10 @@ jobs:
             arch: arm64
             unpacked: linux-arm64-unpacked
           - name: macOS x64 and arm64
-            runner: macos-14
+            # macos-14 was retired: its runners answer "The configuration
+            # 'macos-14-arm64-us-default' is not supported". macos-15 is the
+            # current arm64 image and still builds both architectures.
+            runner: macos-15
             args: --mac --x64 --arm64
             arch: ""
             unpacked: mac
