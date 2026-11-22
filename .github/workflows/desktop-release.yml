@@ -59,14 +59,25 @@ jobs:
             args: --linux --arm64
             arch: arm64
             unpacked: linux-arm64-unpacked
-          - name: macOS x64 and arm64
-            # macos-14 was retired: its runners answer "The configuration
-            # 'macos-14-arm64-us-default' is not supported". macos-15 is the
-            # current arm64 image and still builds both architectures.
-            runner: macos-15
-            args: --mac --x64 --arm64
-            arch: ""
+          # macOS is split by architecture on purpose. One job building both
+          # architectures loses *everything* when a runner is scarce, and the
+          # arm64 pool is the one that queues: "Due to capacity constraints,
+          # jobs targeting macOS arm64 runners may experience longer queue
+          # times". Split, an unavailable arm64 runner only costs the arm64
+          # artifacts, and the Intel image (macos-15-intel) usually still ships
+          # a dmg. macos-14 is retired and must not be used: it answers
+          # "The configuration 'macos-14-arm64-us-default' is not supported".
+          - name: macOS x64
+            runner: macos-15-intel
+            args: --mac --x64
+            arch: x64
             unpacked: mac
+            optional: true
+          - name: macOS arm64
+            runner: macos-15
+            args: --mac --arm64
+            arch: arm64
+            unpacked: mac-arm64
             optional: true
     steps:
       - uses: actions/checkout@v4
